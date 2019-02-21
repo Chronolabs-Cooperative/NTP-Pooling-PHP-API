@@ -132,10 +132,10 @@ if (!function_exists("getHostsLestatsKeys")) {
                 $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `hostname`, `pinging` as `pinging-in-ms` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinging` > 0 ORDER BY `pinging` ASC";
                 break;
             case 'uptime':
-                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `hostname`, `uptime` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` > `downtime` ORDER BY `uptime` DESC";
+                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `hostname`, `uptime` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` > `downtime` AND `uptime` > 0  ORDER BY `uptime` DESC";
                 break;
             case 'downtime':
-                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `hostname`, `downtime` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` <= `downtime` ORDER BY `downtime` DESC";
+                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `hostname`, `downtime` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` <= `downtime` AND `downtime` > 0 ORDER BY `downtime` DESC";
                 break;
             case 'nextping':
                 $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `hostname`, `pinged` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinged` > UNIX_TIMESTAMP() ORDER BY `pinged` ASC";
@@ -173,12 +173,12 @@ if (!function_exists("getHostsRSS")) {
             case 'top':
                 $feed['title'] = "Top NTP Services on: " . API_URL;
                 $feed['desc'] = "This is the top NTP Services on: " . API_URL . " ~ they can variable and variate from time to time!";
-                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat(`uptime` / `pinging`, `id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, UNIX_TIMESTAMP() as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` / `pinging` > 0 AND `pinging` > 0 ORDER BY `uptime` / `pinging` ASC LIMIT $items";
+                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat((`uptime` / `pinging` * 1000), `id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, `online` as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE (`uptime` / `pinging` * 1000) > 0 HAVING (`pinged` > UNIX_TIMESTAMP() AND `pinging` > 0 AND `uptime` > 0) ORDER BY (`uptime` / `pinging` * 1000) DESC LIMIT $items";
                 break;
             case 'worse':
                 $feed['title'] = "Worse NTP Services on: " . API_URL;
                 $feed['desc'] = "This is the worst NTP Services on: " . API_URL . " ~ they can variable and variate from time to time!";
-                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat(`downtime` * `pinging`, `id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, UNIX_TIMESTAMP() as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `downtime` * `pinging` > 0 AND `pinging` > 0  ORDER BY `downtime` * `pinging` DESC LIMIT $items";
+                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat((`downtime` * `pinging` / 1000), `id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, `offline` as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE (`downtime` * `pinging` / 1000) > 0 HAVING (`pinged` > UNIX_TIMESTAMP() AND `pinging` > 0  AND `downtime` > 0) ORDER BY (`downtime` * `pinging` / 1000) DESC LIMIT $items";
                 break;
             case 'new':
                 $feed['title'] = "New NTP Services on: " . API_URL;
@@ -210,8 +210,10 @@ if (!function_exists("getHostsRSS")) {
             $items = array();
             foreach($results as $key => $result) {
                 $items[$key] = $feeditem;
-                foreach($result as $field => $value)
-                    $items[$key] = str_replace("%$field", $value, $items[$key]);
+                $keys = array_keys($result);
+                sort($keys, SORT_DESC);
+                foreach($keys as $field)
+                    $items[$key] = str_replace("%$field", $result[$field], $items[$key]);
             }
             $feed['items'] = implode("\n\n", $items);
             $feedxml = file_get_contents(__DIR__ . DS . 'data' . DS . 'feed.xml');
