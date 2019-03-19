@@ -96,6 +96,39 @@ if (!function_exists("editNTP")) {
 }
 
 
+function checkEmail($email, $antispam = false)
+{
+    if (!$email || !preg_match('/^[^@]{1,64}@[^@]{1,255}$/', $email)) {
+        return false;
+    }
+    $email_array      = explode('@', $email);
+    $local_array      = explode('.', $email_array[0]);
+    $local_arrayCount = count($local_array);
+    for ($i = 0; $i < $local_arrayCount; ++$i) {
+        if (!preg_match("/^(([A-Za-z0-9!#$%&'*+\/\=?^_`{|}~-][A-Za-z0-9!#$%&'*+\/\=?^_`{|}~\.-]{0,63})|(\"[^(\\|\")]{0,62}\"))$/", $local_array[$i])) {
+            return false;
+        }
+    }
+    if (!preg_match("/^\[?[0-9\.]+\]?$/", $email_array[1])) {
+        $domain_array = explode('.', $email_array[1]);
+        if (count($domain_array) < 2) {
+            return false; // Not enough parts to domain
+        }
+        for ($i = 0; $i < count($domain_array); ++$i) {
+            if (!preg_match("/^(([A-Za-z0-9][A-Za-z0-9-]{0,61}[A-Za-z0-9])|([A-Za-z0-9]+))$/", $domain_array[$i])) {
+                return false;
+            }
+        }
+    }
+    if ($antispam) {
+        $email = str_replace('@', ' at ', $email);
+        $email = str_replace('.', ' dot ', $email);
+    }
+    
+    return $email;
+}
+
+
 if (!function_exists("getHostsKeys")) {
     
     function getHostsKeys($mode, $format) 
@@ -103,10 +136,10 @@ if (!function_exists("getHostsKeys")) {
 
         switch ($mode) {
             case 'online':
-                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `hostname`, `port`, `companyname` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` > `downtime` ORDER BY `uptime` DESC";
+                $sql = "SELECT *, md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` > `downtime` AND `uptime` > 0 ORDER BY `uptime` DESC";
                 break;
             case 'offline':
-                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `hostname`, `port`, `companyname` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` <= `downtime` ORDER BY `downtime` DESC";
+                $sql = "SELECT *, md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` <= `downtime` ORDER BY `downtime` DESC";
                 break;
         }
         
@@ -114,8 +147,23 @@ if (!function_exists("getHostsKeys")) {
         $result = $GLOBALS['APIDB']->queryF($sql);
         while($row = $GLOBALS['APIDB']->fetchArray($result))
         {
-            if (!isset($results[str_replace('.', ' ', $row['hostname'])]))
-                $results[str_replace('.', '-', $row['hostname'])] = $row;
+            $key = nef($row['hostname']);
+            unset($row['state']);
+            unset($row['id']);
+            $row['nameemail'] = checkEmail($row['nameemail'], true);
+            $row['companyemail'] = checkEmail($row['companyemail'], true);
+            foreach(array('pinged', 'prevping', 'emailed', 'reportnext', 'reportlast', 'online', 'offline', 'updated') as $field)
+                if (!empty($row[$field]))
+                    $row[$field] = date('Y-m-d, D, H:i:s', $row[$field]);
+                else 
+                    unset($row[$field]);
+            foreach(array('uptime', 'downtime') as $field)
+                if (!empty($row[$field]))
+                    $row[$field] = formatMSASTime($row[$field]);
+                else
+                    unset($row[$field]);
+            if (!isset($results[$key]))
+                $results[$key] = $row;
         }
         return $results;
     }
@@ -135,7 +183,7 @@ if (!function_exists("getHostsLestatsKeys")) {
                 $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `hostname`, `uptime` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` > `downtime` AND `uptime` > 0  ORDER BY `uptime` DESC";
                 break;
             case 'downtime':
-                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `hostname`, `downtime` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` <= `downtime` AND `downtime` > 0 ORDER BY `downtime` DESC";
+                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `hostname`, `downtime` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` <= `downtime` ORDER BY `downtime` DESC";
                 break;
             case 'nextping':
                 $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `hostname`, `pinged` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinged` > UNIX_TIMESTAMP() ORDER BY `pinged` ASC";
@@ -146,20 +194,65 @@ if (!function_exists("getHostsLestatsKeys")) {
         $result = $GLOBALS['APIDB']->queryF($sql);
         while($row = $GLOBALS['APIDB']->fetchArray($result))
         {
+            $key = nef($row['hostname']);
             if (isset($row['uptime']))
                 $row['uptime'] = formatMSASTime($row['uptime'] * 1000);
             if (isset($row['downtime']))
                 $row['downtime'] = formatMSASTime($row['downtime'] * 1000);
             if (isset($row['pinged']))
                 $row['pinged'] = date("Y-m-d W, D, H:i:s", $row['pinged']);
-            if (!isset($results[str_replace('.', ' ', $row['hostname'])]))
-                $results[str_replace('.', '-', $row['hostname'])] = $row;
+            if (!isset($results[$key]))
+                $results[$key] = $row;
         }
         return $results;
     }
 }
 
 
+if (!function_exists('nef'))
+{
+    
+    function nef($subject = '', $stripe ='-')
+    {
+        $replacements = array("one" => "1", "two" => "2", "three" => "3", "four" => "4", "five" => "5", "six" => "6", "seven" => "7", "eight" => "8", "nine" => "9", "zero" => "0");
+        foreach($replacements as $replace => $search)
+            $subject = str_replace($search, $replace, $subject);
+        return sef($subject, $stripe);
+    }
+}
+
+if (!function_exists('sef'))
+{
+    
+    function sef($value = '', $stripe ='-')
+    {
+        return yonkOnlyAlphanumeric($value, $stripe);
+    }
+}
+
+
+if (!function_exists('yonkOnlyAlphanumeric'))
+{
+    
+    function yonkOnlyAlphanumeric($value = '', $stripe ='-')
+    {
+        $replacement_chars = array();
+        $accepted = array("a","b","c","d","e","f","g","h","i","j","k","l","m","n","m","o","p","q",
+            "r","s","t","u","v","w","x","y","z","0","9","8","7","6","5","4","3","2","1");
+        for($i=0;$i<256;$i++){
+            if (!in_array(strtolower(chr($i)),$accepted))
+                $replacement_chars[] = chr($i);
+        }
+        $result = trim(str_replace($replacement_chars, $stripe, strtolower($value)));
+        while(strpos($result, $stripe.$stripe, 0))
+            $result = (str_replace($stripe.$stripe, $stripe, $result));
+        while(substr($result, 0, strlen($stripe)) == $stripe)
+            $result = substr($result, strlen($stripe), strlen($result) - strlen($stripe));
+        while(substr($result, strlen($result) - strlen($stripe), strlen($stripe)) == $stripe)
+            $result = substr($result, 0, strlen($result) - strlen($stripe));
+        return($result);
+    }
+}
 if (!function_exists("getHostsRSS")) {
     
     function getHostsRSS($mode, $items, $format) {
@@ -173,12 +266,12 @@ if (!function_exists("getHostsRSS")) {
             case 'top':
                 $feed['title'] = "Top NTP Services on: " . API_URL;
                 $feed['desc'] = "This is the top NTP Services on: " . API_URL . " ~ they can variable and variate from time to time!";
-                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat((`uptime` / `pinging` * 1000), `id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, `online` as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE (`uptime` / `pinging` * 1000) > 0 HAVING (`pinged` > UNIX_TIMESTAMP() AND `pinging` > 0 AND `uptime` > 0) ORDER BY (`uptime` / `pinging` * 1000) DESC LIMIT $items";
+                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat((`uptime` / `pinging`), `id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, `online` as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE (`uptime` / `pinging`) > 0 HAVING (`pinged` > UNIX_TIMESTAMP() AND `pinging` > 0 AND `uptime` > 0) ORDER BY (`uptime` / `pinging`) DESC LIMIT $items";
                 break;
             case 'worse':
                 $feed['title'] = "Worse NTP Services on: " . API_URL;
                 $feed['desc'] = "This is the worst NTP Services on: " . API_URL . " ~ they can variable and variate from time to time!";
-                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat((`downtime` * `pinging` / 1000), `id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, `offline` as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE (`downtime` * `pinging` / 1000) > 0 HAVING (`pinged` > UNIX_TIMESTAMP() AND `pinging` > 0  AND `downtime` > 0) ORDER BY (`downtime` * `pinging` / 1000) DESC LIMIT $items";
+                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat((`downtime` * `pinging`), `id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, `offline` as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE (`downtime` * `pinging`) > 0 HAVING (`pinged` > UNIX_TIMESTAMP() AND `pinging` > 0  AND `downtime` > 0) ORDER BY (`downtime` * `pinging`) DESC LIMIT $items";
                 break;
             case 'new':
                 $feed['title'] = "New NTP Services on: " . API_URL;
@@ -191,19 +284,20 @@ if (!function_exists("getHostsRSS")) {
         $result = $GLOBALS['APIDB']->queryF($sql);
         while($row = $GLOBALS['APIDB']->fetchArray($result))
         {
+            $key = nef($row['hostname']);
             $row['title'] = $row['companyname'] . ' ~ [ ' . $row['hostname'] . ":" . $row['port'] . ' ] :: [ ' . formatMSASTime($row['pinging']) . ' ]';
             if (isset($row['uptime']))
-                $row['uptime'] = formatMSASTime($row['uptime'] * 1000);
+                $row['uptime'] = formatMSASTime($row['uptime']);
             if (isset($row['downtime']))
-                $row['downtime'] = formatMSASTime($row['downtime'] * 1000);
+                $row['downtime'] = formatMSASTime($row['downtime']);
             if (isset($row['pinging']))
                 $row['pinging'] = formatMSASTime($row['pinging']);
             if (isset($row['pinged']))
                 $row['pinged'] = date("Y-m-d W, D, H:i:s", $row['pinged']);
             if (isset($row['pubDate']))
                 $row['pubDate'] = formatRssTimestamp($row['pubDate']);
-            if (!isset($results[str_replace('.', ' ', $row['hostname'])]))
-                $results[str_replace('.', '-', $row['hostname'])] = $row;
+            if (!isset($results[$key]))
+                $results[$key] = $row;
         }
         if (count($results)) {
             $feeditem = file_get_contents(__DIR__ . DS . 'data' . DS . 'item.xml');
@@ -404,7 +498,7 @@ if (!function_exists("getHostnamePing")) {
                     $ms = $ms + (integer)$parts[0];
                     $num++;
                 } elseif (isset($parts[0]) && is_numeric($parts[0]) && $parts[1] = 's') {
-                    $ms = $ms + (integer)$parts[0] / 60 * 1000;
+                    $ms = $ms + (integer)$parts[0] / 60;
                     $num++;
                 }
             }
@@ -453,9 +547,9 @@ if (!function_exists("getHostnameNTPPing")) {
         $ms = $num = 0;
         for($l=0; $l < mt_rand(7,19); $l++) {
             $start = microtime(true);
-            die($time = getTimeFromNTP($hostname, $port));
+            $time = getTimeFromNTP($hostname, $port);
             if ($time<>0) {
-                $ms += (microtime(true) * 1000) - ($start * 1000);
+                $ms += (microtime(true)) - ($start);
                 $num++;
             }
         }
@@ -476,51 +570,61 @@ if (!function_exists("formatMSASTime")) {
      */
     function formatMSASTime($milliseconds = '')
     {
-        STATIC $return = array();
+        $return = '';
+        $milliseconds = $milliseconds;
+        if (($milliseconds / (3600 * 24 * 7 * 4 * 12)) >= 1)
+        {
+            $scratch = (string)($milliseconds / (3600 * 24 * 7 * 4 * 12));
+            $parts = explode(".", $scratch);
+            $return .= $parts[0] . ' year' .($parts[0]>1?"s ":" ");
+            $milliseconds = ((float)("0." . $parts[1])) * (3600 * 24 * 7 * 4 * 12);
+        }
+        if (($milliseconds / (3600 * 24 * 7 * 4)) >= 1)
+        {
+            $scratch = (string)($milliseconds / (3600 * 24 * 7 * 4));
+            $parts = explode(".", $scratch);
+            $return .= $parts[0] . ' month' .($parts[0]>1?"s ":" ");
+            $milliseconds = ((float)("0." . $parts[1])) * (3600 * 24 * 7 * 4);
+        }
+        if (($milliseconds / (3600 * 24 * 7)) >= 1)
+        {
+            $scratch = (string)($milliseconds /(3600 * 24 * 7));
+            $parts = explode(".", $scratch);
+            $return .= $parts[0] . ' week' .($parts[0]>1?"s ":" ");
+            $milliseconds = ((float)("0." . $parts[1])) * (3600 * 24 * 7);
+        }
+        if (($milliseconds / (3600*24)) >= 1)
+        {
+            $scratch = (string)($milliseconds / (3600 * 24));
+            $parts = explode(".", $scratch);
+            $return .= $parts[0] . ' day' .($parts[0]>1?"s ":" ");
+            $milliseconds = ((float)("0." . $parts[1])) * (3600 * 24);
+        }
+        if (($milliseconds / 3600) >= 1)
+        {
+            $scratch = (string)($milliseconds / 3600);
+            $parts = explode(".", $scratch);
+            $return .= $parts[0] . ' hour' .($parts[0]>1?"s ":" ");
+            $milliseconds = ((float)("0." . $parts[1])) * 3600;
+        }
+        if (($milliseconds / 60) >= 1)
+        {
+            $scratch = (string)($milliseconds / 60);
+            $parts = explode(".", $scratch);
+            $return .= $parts[0] . ' min' .($parts[0]>1?"s ":" ");
+            $milliseconds = ((float)("0." . $parts[1])) * 60;
+        }
+        if (($milliseconds / 60) >= 1)
+        {
+            $scratch = (string)($milliseconds / 60);
+            $parts = explode(".", $scratch);
+            $return .= $parts[0] . ' sec' .($parts[0]>1?"s ":" ");
+            $milliseconds = ((float)("0." . $parts[1])) * 60;
+        }
+        if (empty($return))
+            $return = 'No Time Passed!';
         
-        if (isset($return[$milliseconds]))
-            return $return[$milliseconds];
-        
-        $return[$milliseconds] = '';
-        if (3600 * 24 * 7 > ($milliseconds / 1000 / 3600 / 24 / 7))
-        {
-            $scratch = ($milliseconds/1000/3600/24/7);
-            $parts = explode(".", $scratch);
-            $return[$milliseconds] .= $parts[0] . 'week' .($parts[0]>1?"s ":" ");
-            $milliseconds = ((float)"0." . $parts[1]) * 1000 * 3600 * 24 * 7;
-        }
-        if (3600 * 24 * 1 > ($milliseconds / 1000 / 3600 / 24 / 1))
-        {
-            $scratch = ($milliseconds/1000/3600/24/1);
-            $parts = explode(".", $scratch);
-            $return[$milliseconds] .= $parts[0] . 'day' .($parts[0]>1?"s ":" ");
-            $milliseconds = ((float)"0." . $parts[1]) * 1000 * 3600 * 24 * 1;
-        }
-        if (3600 > ($milliseconds / 1000 / 3600))
-        {
-            $scratch = ($milliseconds/1000/3600);
-            $parts = explode(".", $scratch);
-            $return[$milliseconds] .= $parts[0] . 'hour' .($parts[0]>1?"s ":" ");
-            $milliseconds = ((float)"0." . $parts[1]) * 1000 * 3600 * 24 * 1;
-        }
-        if (60 > ($milliseconds / 1000 / 60))
-        {
-            $scratch = ($milliseconds/1000/60);
-            $parts = explode(".", $scratch);
-            $return[$milliseconds] .= $parts[0] . 'min' .($parts[0]>1?"s ":" ");
-            $milliseconds = ((float)"0." . $parts[1]) * 1000 * 60;
-        }
-        if (60 > ($milliseconds / 1000 / 60))
-        {
-            $scratch = ($milliseconds/1000/60);
-            $parts = explode(".", $scratch);
-            $return[$milliseconds] .= $parts[0] . 'sec' .($parts[0]>1?"s ":" ");
-            $milliseconds = ((float)"0." . $parts[1]) * 1000 * 60;
-        }
-        if ($return[$milliseconds]=='')
-            $return[$milliseconds] = 'No Time Passed!';
-        
-        return $return[$milliseconds] = trim($return[$milliseconds]);
+        return $return = trim($return);
     }
 }
 

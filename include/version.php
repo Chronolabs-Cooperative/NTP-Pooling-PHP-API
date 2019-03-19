@@ -41,5 +41,5 @@ defined('API_ROOT_PATH') || exit('Restricted access');
 /**
  *  Define API version
  */
-define('API_VERSION', 'NTP Listing Services for ntp.snails.email 1.0.4');
+define('API_VERSION', 'NTP Listing Services for ntp.snails.email 1.0.2');
 define('API_TYPE', 'ntp-api');
