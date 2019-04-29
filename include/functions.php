@@ -1,4 +1,4 @@
-<?php
+ping<?php
 /**
  * Email Account Propogation REST Services API
  *
@@ -38,23 +38,20 @@ if (!function_exists("addNTP")) {
 
     function addNTP($hostname, $port, $name, $nameemail, $nameurl, $companyname, $companyemail, $companyrbn, $companyrbntype, $companytype, $companyurl, $format) 
     {
-        if (validateDomain($hostname)) {
-            if (validateEmail($nameemail) || (!validateEmail($nameemail) && !validateEmail($companyemail))) {
-                if (validateEmail($companyemail) || (!validateEmail($nameemail) && !validateEmail($companyemail))) {
-                    $sql = "INSERT INTO `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` (`typal`, `state`, `hostname`, `port`, `name`, `nameemail`, `nameurl`, `companyname`, `companyemail`, `companyrbn`, `companyrbntype`, `companytype`, `companyurl`) VALUES('pool', 'bucky', '" . $GLOBALS['APIDB']->escape($hostname) . "', '" . $GLOBALS['APIDB']->escape($port) . "', '" . $GLOBALS['APIDB']->escape($name) . "', '" . $GLOBALS['APIDB']->escape($nameemail) . "', '" . $GLOBALS['APIDB']->escape($nameurl) . "', '" . $GLOBALS['APIDB']->escape($companyname) . "', '" . $GLOBALS['APIDB']->escape($companyemail) . "', '" . $GLOBALS['APIDB']->escape($companyrbn) . "', '" . $GLOBALS['APIDB']->escape($companyrbntype) . "', '" . $GLOBALS['APIDB']->escape($companytype) . "', '" . $GLOBALS['APIDB']->escape($companyurl) . "')";
-                    if ($GLOBALS['APIDB']->queryF($sql)) {
-                        return array('code' => 201, 'errors' => array(), 'key' => md5($GLOBALS['APIDB']->getInsertId().$nameemail.$companyemail.'ntpservice'.API_URL));
-                    } else {
-                        return array('code' => 501, 'errors' => array($GLOBALS['APIDB']->errno => "Error with SQL: $sql;"));
-                    }
+   
+        if (validateEmail($nameemail) || (!validateEmail($nameemail) && !validateEmail($companyemail))) {
+            if (validateEmail($companyemail) || (!validateEmail($nameemail) && !validateEmail($companyemail))) {
+                $sql = "INSERT INTO `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` (`typal`, `state`, `hostname`, `port`, `name`, `nameemail`, `nameurl`, `companyname`, `companyemail`, `companyrbn`, `companyrbntype`, `companytype`, `companyurl`) VALUES('pool', 'bucky', '" . $GLOBALS['APIDB']->escape($hostname) . "', '" . $GLOBALS['APIDB']->escape($port) . "', '" . $GLOBALS['APIDB']->escape($name) . "', '" . $GLOBALS['APIDB']->escape($nameemail) . "', '" . $GLOBALS['APIDB']->escape($nameurl) . "', '" . $GLOBALS['APIDB']->escape($companyname) . "', '" . $GLOBALS['APIDB']->escape($companyemail) . "', '" . $GLOBALS['APIDB']->escape($companyrbn) . "', '" . $GLOBALS['APIDB']->escape($companyrbntype) . "', '" . $GLOBALS['APIDB']->escape($companytype) . "', '" . $GLOBALS['APIDB']->escape($companyurl) . "')";
+                if ($GLOBALS['APIDB']->queryF($sql)) {
+                    return array('code' => 201, 'errors' => array(), 'key' => md5($GLOBALS['APIDB']->getInsertId().$nameemail.$companyemail.'ntpservice'.API_URL));
                 } else {
-                    return array('code' => 501, 'errors' => array(101 => 'Company Email doesn\'t conform to email standard!'));
+                    return array('code' => 501, 'errors' => array($GLOBALS['APIDB']->errno => "Error with SQL: $sql;"));
                 }
             } else {
-                return array('code' => 501, 'errors' => array(102 => 'Telephanist Email doesn\'t conform to email standard!'));
+                return array('code' => 501, 'errors' => array(101 => 'Company Email doesn\'t conform to email standard!'));
             }
         } else {
-            return array('code' => 501, 'errors' => array(103 => 'Hostname of NTP Service doesn\'t conform to netbios net addressing cname standard!'));
+            return array('code' => 501, 'errors' => array(102 => 'Telephanist Email doesn\'t conform to email standard!'));
         }
         return false;
     }
@@ -70,23 +67,19 @@ if (!function_exists("editNTP")) {
         $sql = "SELECT `id` WHERE 'state' = 'bucky' AND '$key' = md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."'))";
         list($id) = $GLOBALS['APIDB']->fetchRow($GLOBALS['APIDB']->queryF($sql));
         if ($id <> 0) {
-            if (getHostnameNTPPing($hostname, $port) > 0) {
-                if (validateEmail($nameemail) || (!validateEmail($nameemail) && !validateEmail($companyemail))) {
-                    if (validateEmail($companyemail) || (!validateEmail($nameemail) && !validateEmail($companyemail))) {
-                        $sql = "UPDATE `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` SET `state` = 'assigned', `hostname` = '" . $GLOBALS['APIDB']->escape($hostname) . "', `port` = '" . $GLOBALS['APIDB']->escape($port) . "', `name` = '" . $GLOBALS['APIDB']->escape($name) . "', `nameemail`  = '" . $GLOBALS['APIDB']->escape($nameemail) . "', `nameurl` = '" . $GLOBALS['APIDB']->escape($nameurl) . "', `companyname` = '" . $GLOBALS['APIDB']->escape($companyname) . "', `companyemail` = '" . $GLOBALS['APIDB']->escape($companyemail) . "', `companyrbn` = '" . $GLOBALS['APIDB']->escape($companyrbn) . "', `companyrbntype` = '" . $GLOBALS['APIDB']->escape($compnayrbntype) . "', `companytype` = '" . $GLOBALS['APIDB']->escape($companytype) . "', `companyurl` = '" . $GLOBALS['APIDB']->escape($companyurl) . "' WHERE `id` = '$id'";
-                        if ($GLOBALS['APIDB']->queryF($sql)) {
-                            return array('code' => 201, 'errors' => array(), 'key' => md5($id.$nameemail.$companyemail.'ntpservice'.API_URL));
-                        } else {
-                            return array('code' => 501, 'errors' => array($GLOBALS['APIDB']->errno =>  "Error with SQL: $sql;"));
-                        }
+            if (validateEmail($nameemail) || (!validateEmail($nameemail) && !validateEmail($companyemail))) {
+                if (validateEmail($companyemail) || (!validateEmail($nameemail) && !validateEmail($companyemail))) {
+                    $sql = "UPDATE `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` SET `state` = 'assigned', `hostname` = '" . $GLOBALS['APIDB']->escape($hostname) . "', `port` = '" . $GLOBALS['APIDB']->escape($port) . "', `name` = '" . $GLOBALS['APIDB']->escape($name) . "', `nameemail`  = '" . $GLOBALS['APIDB']->escape($nameemail) . "', `nameurl` = '" . $GLOBALS['APIDB']->escape($nameurl) . "', `companyname` = '" . $GLOBALS['APIDB']->escape($companyname) . "', `companyemail` = '" . $GLOBALS['APIDB']->escape($companyemail) . "', `companyrbn` = '" . $GLOBALS['APIDB']->escape($companyrbn) . "', `companyrbntype` = '" . $GLOBALS['APIDB']->escape($compnayrbntype) . "', `companytype` = '" . $GLOBALS['APIDB']->escape($companytype) . "', `companyurl` = '" . $GLOBALS['APIDB']->escape($companyurl) . "' WHERE `id` = '$id'";
+                    if ($GLOBALS['APIDB']->queryF($sql)) {
+                        return array('code' => 201, 'errors' => array(), 'key' => md5($id.$nameemail.$companyemail.'ntpservice'.API_URL));
                     } else {
-                        return array('code' => 501, 'errors' => array(101 => 'Company Email doesn\'t conform to email standard!'));
+                        return array('code' => 501, 'errors' => array($GLOBALS['APIDB']->errno =>  "Error with SQL: $sql;"));
                     }
                 } else {
-                    return array('code' => 501, 'errors' => array(102 => 'Telephanist Email doesn\'t conform to email standard!'));
+                    return array('code' => 501, 'errors' => array(101 => 'Company Email doesn\'t conform to email standard!'));
                 }
             } else {
-                return array('code' => 501, 'errors' => array(101 => 'Hostname doesn\'t ping or pickup!'));
+                return array('code' => 501, 'errors' => array(102 => 'Telephanist Email doesn\'t conform to email standard!'));
             }
         } else {
             return array('code' => 501, 'errors' => array(101 => 'Key doesn\'t match any records!'));
@@ -503,7 +496,7 @@ if (!function_exists("getHostnamePing")) {
                 }
             }
         }
-        return $ms / $num;
+        return (float)(is_numeric($result = $ms / $num)?$result:0);
     }
 }
 
@@ -514,23 +507,23 @@ if (!function_exists("getHostnamePing")) {
  * @param  integer $timeout Timeout  in seconds (default is 10 seconds)
  * @return integer Number of seconds since January 1st 1970
  */
-function getTimeFromNTP($host = 'pool.ntp.org', $port = 123, $timeout = 27)
+function getTimeFromNTP($host = 'ntp.snails.email', $port = 123, $timeout = 42)
 {
-    $fp = fsockopen($host,$port,$err,$errstr,$timeout);
-    # parameters: server, socket, error code, error text, timeout
-    if($fp)
-    {
-        fputs($fp, "\n");
-        $timevalue = fread($fp, 49);
-        fclose($fp); # close the connection
-    }
-    else
-    {
-        $timevalue = " ";
-    }
-    if ($err <> 0)
-        die("\n\n#$err - $errstr\n\n");
-    return (float)$timevalue;
+    $socket = stream_socket_client('udp://' . $host . ':' . $port, $errno, $errstr, (int)$timeout);
+    $msg = "\010" . str_repeat("\0", 47);
+    fwrite($socket, $msg);
+    $response = fread($socket, 48);
+    fclose($socket);
+    // unpack to unsigned long
+    $data = unpack('N12', $response);
+    // 9 =  Receive Timestamp (rec): Time at the server when the request arrived
+    // from the client, in NTP timestamp format.
+    $timestamp = sprintf('%u', $data[9]);
+    // NTP = number of seconds since January 1st, 1900
+    // Unix time = seconds since January 1st, 1970
+    // remove 70 years in seconds to get unix timestamp from NTP time
+    $timestamp -= 2208988800;
+    return $timestamp;
 }
 
 if (!function_exists("getHostnameNTPPing")) {
