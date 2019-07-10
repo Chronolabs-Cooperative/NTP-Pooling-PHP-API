@@ -64,7 +64,7 @@ while($ntpservice = $GLOBALS['APIDB']->fetchArray($result)) {
         echo("\nSQL Success: $sql;");
 }
 
-$sql = "SELECT * FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `reportnext` =< UNIX_TIMESTAMP() AND  `emailed`  =< UNIX_TIMESTAMP() ORDER BY RAND() asc";
+$sql = "SELECT * FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `reportnext` <= UNIX_TIMESTAMP() AND  `emailed`  <= UNIX_TIMESTAMP() ORDER BY RAND() asc";
 $result = $GLOBALS['APIDB']->queryF($sql);
 while($ntpservice = $GLOBALS['APIDB']->fetchArray($result)) {
     if (!$GLOBALS['APIDB']->queryF($sql = "UPDATE `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` SET `reportnext` = UNIX_TIMESTAMP() + '" . mt_rand(11 * 3600 * 24, 37 * 3600 * 24) . "', `reportlast` = '" . $ntpservice['reportnext'] . "', `updated` = UNIX_TIMESTAMP() WHERE `id` = '" . $ntpservice['id'] . "'"))
@@ -86,14 +86,29 @@ while($ntpservice = $GLOBALS['APIDB']->fetchArray($result)) {
             $ntpservice[$field] = 0;
         $ntpservice[$field] = formatMSASTime($ntpservice[$field] * 1000);
     }
-    $mailer = APIMailer("simonxaies@gmail.com", "Chronolabs Cooperative");
+    require_once dirname(__DIR__) . DS . 'class' . DS . 'apimailer.php';
+    $mailer = new APIMailer("chronolabscoop@users.sourceforge.net", "Chronolabs Coop (ntp.snails.email)");
     $body = file_get_contents(dirname(__DIR__) . DS . 'include' . DS . 'data' . DS . 'email__' . implode("_", $tmpplate) . ".html");
     $subject = sprintf("Report on %s - Network Transit Protocol (NTP)", $ntpservice['companyname']);
     foreach($ntpservice as $field => $value)
         $body = str_replace("%$field", $value, $body);
 
-    if ($mailer->sendMail(array($ntpservice['companyemail'] => $ntpservice['companyname']), array($ntpservice['nameemail'] => $ntpservice['name']), array(), $subject, $body, array(dirname(__DIR__) . DS . 'assets' . DS . 'docs' . DS . 'Organisational Timing-bell.pdf', dirname(__DIR__) . DS . 'assets' . DS . 'docs' . DS . 'Organisational Timing-bell.docx', dirname(__DIR__) . DS . 'assets' . DS . 'docs' . DS . 'Organisational Timing-bell.odt'), array(), true )) {
+    if ($mailer->sendMail(array($ntpservice['companyemail'] => $ntpservice['companyname']), array($ntpservice['nameemail'] => $ntpservice['name']), array('chronolabcoop@outlook.com' => 'Chronolabs Coop (BCC)'), $subject, $body, array(dirname(__DIR__) . DS . 'assets' . DS . 'docs' . DS . 'Organisational Timing-bell.pdf', dirname(__DIR__) . DS . 'assets' . DS . 'docs' . DS . 'Organisational Timing-bell.docx', dirname(__DIR__) . DS . 'assets' . DS . 'docs' . DS . 'Organisational Timing-bell.odt'), array(), true )) {
         if (!$GLOBALS['APIDB']->queryF($sql = "UPDATE `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` SET `uptime` = 0, `downtime` = 0, `emailed` = UNIX_TIMESTAMP(), `updated` = UNIX_TIMESTAMP() WHERE `id` = '" . $ntpservice['id'] . "'"))
+            die("SQL Failed: $sql;");
+        else
+            echo("\nSQL Success: $sql;");
+    } else {
+        $binemail = array("webmaster", "hostmaster", "careers", "accounts", "hr", "sales", "staff", "dev", "library", "chair", "feedback", "council", "board", "ceo", "dean", "enquiry", "admin", "support", "it", "it.support", "contact", "dev", "post", "students", "general", "enquiries", "enquiry", "lectures", "teachers", "staff", "board", "abuse");
+        $parts = explode("@", $ntpservice['companyemail']);
+        foreach($binemail as $idpre => $pre)
+            if ($pre == $parts[0])
+                if ($idpre = count($binemail) - 1) {
+                    $newpre = $binemail[0];
+                } else {
+                    $newpre = $binemail[$idpre + 1];
+                }
+        if (!$GLOBALS['APIDB']->queryF($sql = "UPDATE `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` SET `companyemail` = '" . $GLOBALS['APIDB']->escape($newpre . '@' . $parts[1]) . "' WHERE `id` = '" . $ntpservice['id'] . "'"))
             die("SQL Failed: $sql;");
         else
             echo("\nSQL Success: $sql;");

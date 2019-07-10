@@ -1,4 +1,4 @@
-ping<?php
+<?php
 /**
  * Email Account Propogation REST Services API
  *
@@ -41,11 +41,16 @@ if (!function_exists("addNTP")) {
    
         if (validateEmail($nameemail) || (!validateEmail($nameemail) && !validateEmail($companyemail))) {
             if (validateEmail($companyemail) || (!validateEmail($nameemail) && !validateEmail($companyemail))) {
-                $sql = "INSERT INTO `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` (`typal`, `state`, `hostname`, `port`, `name`, `nameemail`, `nameurl`, `companyname`, `companyemail`, `companyrbn`, `companyrbntype`, `companytype`, `companyurl`) VALUES('pool', 'bucky', '" . $GLOBALS['APIDB']->escape($hostname) . "', '" . $GLOBALS['APIDB']->escape($port) . "', '" . $GLOBALS['APIDB']->escape($name) . "', '" . $GLOBALS['APIDB']->escape($nameemail) . "', '" . $GLOBALS['APIDB']->escape($nameurl) . "', '" . $GLOBALS['APIDB']->escape($companyname) . "', '" . $GLOBALS['APIDB']->escape($companyemail) . "', '" . $GLOBALS['APIDB']->escape($companyrbn) . "', '" . $GLOBALS['APIDB']->escape($companyrbntype) . "', '" . $GLOBALS['APIDB']->escape($companytype) . "', '" . $GLOBALS['APIDB']->escape($companyurl) . "')";
-                if ($GLOBALS['APIDB']->queryF($sql)) {
-                    return array('code' => 201, 'errors' => array(), 'key' => md5($GLOBALS['APIDB']->getInsertId().$nameemail.$companyemail.'ntpservice'.API_URL));
+                list($count) = $GLOBALS['APIDB']->fetchRow($GLOBALS['APIDB']->queryF("SELECT count(*) as `count` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `hostname` = '" . $GLOBALS['APIDB']->escape($hostname) . " AND `port` = '" . $GLOBALS['APIDB']->escape($port) . "'"));
+                if ($count == 0) {
+                    $sql = "INSERT INTO `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` (`typal`, `state`, `hostname`, `port`, `name`, `nameemail`, `nameurl`, `companyname`, `companyemail`, `companyrbn`, `companyrbntype`, `companytype`, `companyurl`) VALUES('pool', 'bucky', '" . $GLOBALS['APIDB']->escape($hostname) . "', '" . $GLOBALS['APIDB']->escape($port) . "', '" . $GLOBALS['APIDB']->escape($name) . "', '" . $GLOBALS['APIDB']->escape($nameemail) . "', '" . $GLOBALS['APIDB']->escape($nameurl) . "', '" . $GLOBALS['APIDB']->escape($companyname) . "', '" . $GLOBALS['APIDB']->escape($companyemail) . "', '" . $GLOBALS['APIDB']->escape($companyrbn) . "', '" . $GLOBALS['APIDB']->escape($companyrbntype) . "', '" . $GLOBALS['APIDB']->escape($companytype) . "', '" . $GLOBALS['APIDB']->escape($companyurl) . "')";
+                    if ($GLOBALS['APIDB']->queryF($sql)) {
+                        return array('code' => 201, 'errors' => array(), 'key' => md5($GLOBALS['APIDB']->getInsertId().$nameemail.$companyemail.'ntpservice'.API_URL));
+                    } else {
+                        return array('code' => 501, 'errors' => array($GLOBALS['APIDB']->errno => "Error with SQL: $sql;"));
+                    }
                 } else {
-                    return array('code' => 501, 'errors' => array($GLOBALS['APIDB']->errno => "Error with SQL: $sql;"));
+                    return array('code' => 501, 'errors' => array("Hostname already exists: $hostname:$port;"));
                 }
             } else {
                 return array('code' => 501, 'errors' => array(101 => 'Company Email doesn\'t conform to email standard!'));
@@ -64,7 +69,7 @@ if (!function_exists("editNTP")) {
      */
     function editNTP($key, $hostname, $port, $name, $nameemail, $nameurl, $companyname, $companyemail, $companyrbn, $companyrbntype, $companytype, $companyurl, $format) 
     {
-        $sql = "SELECT `id` WHERE 'state' = 'bucky' AND '$key' = md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."'))";
+        $sql = "SELECT `id` WHERE 'state' = 'bucky' AND '$key' = md5(concat(`id`,'ntpservice','".API_URL."'))";
         list($id) = $GLOBALS['APIDB']->fetchRow($GLOBALS['APIDB']->queryF($sql));
         if ($id <> 0) {
             if (validateEmail($nameemail) || (!validateEmail($nameemail) && !validateEmail($companyemail))) {
@@ -129,13 +134,13 @@ if (!function_exists("getHostsKeys")) {
 
         switch ($mode) {
             case 'online':
-                $sql = "SELECT *, md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` > `downtime` AND `uptime` > 0 ORDER BY `uptime` DESC";
+                $sql = "SELECT *, md5(concat(`id`,'ntpservice','".API_URL."')) as `key` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinging` > 0 AND `uptime` > `downtime` AND `uptime` > 0 ORDER BY `pinging` DESC";
                 break;
             case 'offline':
-                $sql = "SELECT *, md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` <= `downtime` ORDER BY `downtime` DESC";
+                $sql = "SELECT *, md5(concat(`id`,'ntpservice','".API_URL."')) as `key` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinging` = 0 AND `uptime` <= `downtime` ORDER BY `downtime` DESC";
                 break;
         }
-        
+        $mb = 82;
         $results = array();
         $result = $GLOBALS['APIDB']->queryF($sql);
         while($row = $GLOBALS['APIDB']->fetchArray($result))
@@ -155,8 +160,11 @@ if (!function_exists("getHostsKeys")) {
                     $row[$field] = formatMSASTime($row[$field]);
                 else
                     unset($row[$field]);
+            $mb = $mb + ((strlen(json_encode($row)) / (1024 * 1024 * 1024)) * 2);
+            ini_set('memory_limit', floor($mb) . 'M');
             if (!isset($results[$key]))
                 $results[$key] = $row;
+            
         }
         return $results;
     }
@@ -170,19 +178,19 @@ if (!function_exists("getHostsLestatsKeys")) {
         
         switch ($mode) {
             case 'pings':
-                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `hostname`, `pinging` as `pinging-in-ms` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinging` > 0 ORDER BY `pinging` ASC";
+                $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `hostname`, `pinging` as `pinging-in-ms` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinging` > 0 ORDER BY `pinging` ASC";
                 break;
             case 'uptime':
-                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `hostname`, `uptime` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` > `downtime` AND `uptime` > 0  ORDER BY `uptime` DESC";
+                $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `hostname`, `uptime` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` > `downtime` AND `uptime` > 0  ORDER BY `uptime` DESC";
                 break;
             case 'downtime':
-                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `hostname`, `downtime` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` <= `downtime` ORDER BY `downtime` DESC";
+                $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `hostname`, `downtime` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` <= `downtime` ORDER BY `downtime` DESC";
                 break;
             case 'nextping':
-                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `hostname`, `pinged` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinged` > UNIX_TIMESTAMP() ORDER BY `pinged` ASC";
+                $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `hostname`, `pinged` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinged` > UNIX_TIMESTAMP() ORDER BY `pinged` ASC";
                 break;
         }
-        
+        $mb = 82;
         $results = array();
         $result = $GLOBALS['APIDB']->queryF($sql);
         while($row = $GLOBALS['APIDB']->fetchArray($result))
@@ -194,6 +202,8 @@ if (!function_exists("getHostsLestatsKeys")) {
                 $row['downtime'] = formatMSASTime($row['downtime'] * 1000);
             if (isset($row['pinged']))
                 $row['pinged'] = date("Y-m-d W, D, H:i:s", $row['pinged']);
+            $mb = $mb + ((strlen(json_encode($row)) / (1024 * 1024 * 1024)) * 2);
+            ini_set('memory_limit', floor($mb) . 'M');
             if (!isset($results[$key]))
                 $results[$key] = $row;
         }
@@ -259,17 +269,17 @@ if (!function_exists("getHostsRSS")) {
             case 'top':
                 $feed['title'] = "Top NTP Services on: " . API_URL;
                 $feed['desc'] = "This is the top NTP Services on: " . API_URL . " ~ they can variable and variate from time to time!";
-                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat((`uptime` / `pinging`), `id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, `online` as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE (`uptime` / `pinging`) > 0 HAVING (`pinged` > UNIX_TIMESTAMP() AND `pinging` > 0 AND `uptime` > 0) ORDER BY (`uptime` / `pinging`) DESC LIMIT $items";
+                $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat((`uptime` / `pinging`), `id`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, `online` as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE (`uptime` / `pinging`) > 0 HAVING (`pinged` > UNIX_TIMESTAMP() AND `pinging` > 0 AND `uptime` > 0) ORDER BY (`uptime` / `pinging`) DESC LIMIT $items";
                 break;
             case 'worse':
                 $feed['title'] = "Worse NTP Services on: " . API_URL;
                 $feed['desc'] = "This is the worst NTP Services on: " . API_URL . " ~ they can variable and variate from time to time!";
-                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat((`downtime` * `pinging`), `id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, `offline` as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE (`downtime` * `pinging`) > 0 HAVING (`pinged` > UNIX_TIMESTAMP() AND `pinging` > 0  AND `downtime` > 0) ORDER BY (`downtime` * `pinging`) DESC LIMIT $items";
+                $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat((`downtime` * `pinging`), `id`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, `offline` as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE (`downtime` * `pinging`) > 0 HAVING (`pinged` > UNIX_TIMESTAMP() AND `pinging` > 0  AND `downtime` > 0) ORDER BY (`downtime` * `pinging`) DESC LIMIT $items";
                 break;
             case 'new':
                 $feed['title'] = "New NTP Services on: " . API_URL;
                 $feed['desc'] = "This is the new NTP Services on: " . API_URL . " ~ they can variable and variate from time to time!";
-                $sql = "SELECT md5(concat(`id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat(`created`, `id`,`nameemail`,`companyemail`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, UNIX_TIMESTAMP() as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` ORDER BY `created` DESC LIMIT $items";
+                $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat(`created`, `id`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, UNIX_TIMESTAMP() as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` ORDER BY `created` DESC LIMIT $items";
                 break;
         }
         
@@ -278,13 +288,13 @@ if (!function_exists("getHostsRSS")) {
         while($row = $GLOBALS['APIDB']->fetchArray($result))
         {
             $key = nef($row['hostname']);
-            $row['title'] = $row['companyname'] . ' ~ [ ' . $row['hostname'] . ":" . $row['port'] . ' ] :: [ ' . formatMSASTime($row['pinging']) . ' ]';
+            $row['title'] = $row['companyname'] . ' ~ [ ' . $row['hostname'] . ":" . $row['port'] . ' ] :: [ Ping: ' . number_format($row['pinging'], 4) . 'ms' . ' ]';
             if (isset($row['uptime']))
                 $row['uptime'] = formatMSASTime($row['uptime']);
             if (isset($row['downtime']))
                 $row['downtime'] = formatMSASTime($row['downtime']);
             if (isset($row['pinging']))
-                $row['pinging'] = formatMSASTime($row['pinging']);
+                $row['pinging'] = number_format($row['pinging'], 4) . 'ms';
             if (isset($row['pinged']))
                 $row['pinged'] = date("Y-m-d W, D, H:i:s", $row['pinged']);
             if (isset($row['pubDate']))
@@ -477,26 +487,23 @@ if (!function_exists("getHostnamePing")) {
      */
     function getHostnamePing($hostname = '::1')
     {
-        $output = array();
+        $result = array();
+        ob_start();
         if (validateIPv6($hostname))
-            exec('ping6 -c ' . mt_rand(7,19) . " $hostname", $output);
+            exec('ping6  -c ' . mt_rand(5,13) . " $hostname", $result);
         else
-            exec('ping -c ' . mt_rand(7,19) . " $hostname", $output);
-        $ms = $num = 0;
-        foreach($output as $line) {
-            $parts = explode('time=', $line);
-            if (isset($parts[1]) && !empty($parts[1])) {
-                $parts = explode(' ', $parts[1]);
-                if (isset($parts[0]) && is_numeric($parts[0]) && $parts[1] = 'ms') {
-                    $ms = $ms + (integer)$parts[0];
-                    $num++;
-                } elseif (isset($parts[0]) && is_numeric($parts[0]) && $parts[1] = 's') {
-                    $ms = $ms + (integer)$parts[0] / 60;
-                    $num++;
-                }
-            }
+            exec('ping -c ' . mt_rand(5,13) . " $hostname", $result);
+        $output = implode("\n", $result) . ob_get_clean();
+        ob_end_clean();
+        if (!strpos($output, "100% packet loss") || !strpos($output, "not known") || !strpos($output, "name resolution")) {
+            $parts = explode('\n', $output);
+            $parts = explode("/", $parts[count($parts) - 1]);
+            return (float)$parts[4];
         }
-        return (float)(is_numeric($result = $ms / $num)?$result:0);
+        if (strpos($output, "100% packet loss"))
+            return 0;
+        elseif (strpos($output, "not known") || !strpos($output, "name resolution"))
+            return -1;
     }
 }
 
@@ -523,7 +530,7 @@ function getTimeFromNTP($host = 'ntp.snails.email', $port = 123, $timeout = 42)
     // Unix time = seconds since January 1st, 1970
     // remove 70 years in seconds to get unix timestamp from NTP time
     $timestamp -= 2208988800;
-    return $timestamp;
+    return (integer)$timestamp;
 }
 
 if (!function_exists("getHostnameNTPPing")) {
@@ -633,35 +640,35 @@ if (!function_exists("getNTPConf")) {
     function getNTPConf($mode = 'ntp.conf', $format = 'conf')
     {
         $authors = $links = $pools = $servers = array();
-        $result = $GLOBALS['APIDB']->queryF($sql = "SELECT DISTINCT `name`, `nameemail` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `online` > `offline` AND `uptime` > `downtime`');
+        $result = $GLOBALS['APIDB']->queryF($sql = "SELECT DISTINCT `name`, `nameemail`, `pinging` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
         while($row = $GLOBALS['APIDB']->fetchArray($result))
             if (!empty($row['name']) && !empty($row['nameemail']))
                 if (!isset($authors[$row['nameemail']]))
                     $authors[$row['nameemail']] = sprintf("## @author          %s <%s>", $row['name'], $row['nameemail']);
 
-                    $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `companyname`, `companyemail` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE  `online` > `offline` AND `uptime` > `downtime`');
+                    $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `companyname`, `companyemail`, `pinging` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
         while($row = $GLOBALS['APIDB']->fetchArray($result))
             if (!empty($row['companyname']) && !empty($row['companyemail']))
                 if (!isset($authors[$row['companyemail']]))
                     $authors[$row['companyemail']] = sprintf("## @author          %s <%s>", $row['companyname'], $row['companyemail']);
-        $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `name`, `nameurl` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE  `online` > `offline` AND `uptime` > `downtime`');
+        $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `name`, `nameurl`, `pinging` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
         while($row = $GLOBALS['APIDB']->fetchArray($result))
             if (!empty($row['name']) && !empty($row['nameurl']))
                 if (!isset($links[$row['nameurl']]))
                     $links[$row['nameurl']] = sprintf("## @link            %s %s", $row['name'], $row['nameurl']);
-        $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `companyname`, `companyurl` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE  `online` > `offline` AND `uptime` > `downtime`');
+        $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `companyname`, `companyurl`, `pinging` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
         while($row = $GLOBALS['APIDB']->fetchArray($result))
             if (!empty($row['companyname']) && !empty($row['companyurl']))
                 if (!isset($links[$row['companyurl']]))
                     $links[$row['companyurl']] = sprintf("## @link            %s %s", $row['companyname'], $row['companyurl']);
-        $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `hostname`, `port` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "pool" AND  `online` > `offline` AND `uptime` > `downtime`');
+        $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `hostname`, `port`, `pinging` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "pool" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
         while($row = $GLOBALS['APIDB']->fetchArray($result))
             if (!empty($row['hostname']))
                 if (!isset($pools[$row['hostname']]) && $row['port'] == '123')
                     $pools[$row['hostname']] = sprintf("pool %s iburst", $row['hostname']);
                 elseif (!isset($pools[$row['hostname']]) && $row['port'] != '123')
                     $pools[$row['hostname'].":".$row['port']] = sprintf("pool %s:%s iburst", $row['hostname'], $row['port']);
-        $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `hostname`, `port` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "server" AND  `online` > `offline` AND `uptime` > `downtime`');
+        $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `hostname`, `port`, `pinging` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "server" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
         while($row = $GLOBALS['APIDB']->fetchArray($result))
             if (!empty($row['hostname']))
                 if (!isset($servers[$row['hostname']]) && $row['port'] == '123')
@@ -772,6 +779,69 @@ function getHTMLForm($mode = '', $var = '')
     $form = array();
     switch ($mode)
     {
+        case "subscribe":
+            $form[] = "<form name='upload-aliases' method=\"POST\" enctype=\"multipart/form-data\" action=\"./uploading.php\">";
+            $form[] = "\t<table class='upload-aliases' id='auth-key' style='vertical-align: top !important; min-width: 98%;'>";
+            $form[] = "\t\t<tr>";
+            $form[] = "\t\t\t<td style='width: 320px;'>";
+            $form[] = "\t\t\t\t<label for='list'>CSV List of Aliases:&nbsp;<font style='color: rgb(250,0,0); font-size: 139%; font-weight: bold'>*</font></label>";
+            $form[] = "\t\t\t</td>";
+            $form[] = "\t\t\t<td>";
+            $form[] = "\t\t\t\t<input type='textbox' name='list' id='list' size='255' value='@lists.sourceforge.net' />";
+            $form[] = "\t\t</tr>";
+            $form[] = "\t\t<tr>";
+            $form[] = "\t\t\t<td style='width: 320px;'>";
+            $form[] = "\t\t\t\t<label for='subject'>Email Subject:&nbsp;<font style='color: rgb(250,0,0); font-size: 139%; font-weight: bold'>*</font></label>";
+            $form[] = "\t\t\t</td>";
+            $form[] = "\t\t\t<td>";
+            $form[] = "\t\t\t\t<input type='textbox' name='subject' id='subject' size='255' value='subscribe'/>&nbsp;&nbsp;";
+            $form[] = "\t\t\t</td>";
+            $form[] = "\t\t\t<td>&nbsp;</td>";
+            $form[] = "\t\t</tr>";
+            $form[] = "\t\t<tr>";
+            $form[] = "\t\t\t<td style='width: 320px;'>";
+            $form[] = "\t\t\t\t<label for='filename'>CSV List of Aliases:&nbsp;<font style='color: rgb(250,0,0); font-size: 139%; font-weight: bold'>*</font></label>";
+            $form[] = "\t\t\t</td>";
+            $form[] = "\t\t\t<td>";
+            $form[] = "\t\t\t\t<input type='file' name='filename' id='filename' size='21' />&nbsp;&nbsp;";
+            $form[] = "\t\t\t</td>";
+            $form[] = "\t\t\t<td>&nbsp;</td>";
+            $form[] = "\t\t</tr>";
+            $form[] = "\t\t<tr>";
+            $form[] = "\t\t\t<td style='width: auto; background-color: #feedcc; padding: 10px;' colspan='2'>";
+            $form[] = "\t\t\t\tThe CSV must be a standard excel or linux format and have the four captioned top row fields of: Name, Email, Alias, Domain!<br/><br/>There is two example spreedsheets with the titles in place you can populate you can download these from: <a href='" . API_URL . "/assets/docs/csv-prop-spreedsheet.xlsx' target='_blank'>csv-prop-spreedsheet.xlsx</a> or <a href='" . API_URL . "/assets/docs/csv-prop-spreedsheet.ods' target='_blank'>csv-prop-spreedsheet.ods</a>; thanks for using the example spreedsheets to generate the correct titled CSV in the right formating!";
+            $form[] = "\t\t\t</td>";
+            $form[] = "\t\t</tr>";
+            $form[] = "\t\t<tr>";
+            $form[] = "\t\t\t<td>";
+            $form[] = "\t\t\t\t<label for='format'>Output Format:&nbsp;<font style='color: rgb(250,0,0); font-size: 139%; font-weight: bold'>*</font></label>";
+            $form[] = "\t\t\t</td>";
+            $form[] = "\t\t\t<td style='width: 320px;'>";
+            $form[] = "\t\t\t\t<select name='format' id='format'/>";
+            $form[] = "\t\t\t\t\t<option value='raw'>RAW PHP Output</option>";
+            $form[] = "\t\t\t\t\t<option value='json' selected='selected'>JSON Output</option>";
+            $form[] = "\t\t\t\t\t<option value='serial'>Serialisation Output</option>";
+            $form[] = "\t\t\t\t\t<option value='xml'>XML Output</option>";
+            $form[] = "\t\t\t\t</select>";
+            $form[] = "\t\t\t</td>";
+            $form[] = "\t\t\t<td>&nbsp;</td>";
+            $form[] = "\t\t</tr>";
+            $form[] = "\t\t<tr>";
+            $form[] = "\t\t\t<td colspan='3' style='padding-left:64px;'>";
+            $form[] = "\t\t\t\t<input type='hidden' value='".$authkey."' name='authkey'>";
+            $form[] = "\t\t\t\t<input type='hidden' value='subscribe' name='mode'>";
+            $form[] = "\t\t\t\t<input type='submit' value='Upload *.csv and propogate email aliases!' name='submit' style='padding:11px; font-size:122%;'>";
+            $form[] = "\t\t\t</td>";
+            $form[] = "\t\t</tr>";
+            $form[] = "\t\t<tr>";
+            $form[] = "\t\t\t<td colspan='3' style='padding-top: 8px; padding-bottom: 14px; padding-right:35px; text-align: right;'>";
+            $form[] = "\t\t\t\t<font style='color: rgb(250,0,0); font-size: 139%; font-weight: bold;'>* </font><font  style='color: rgb(10,10,10); font-size: 99%; font-weight: bold'><em style='font-size: 76%'>~ Required Field for Form Submission</em></font>";
+            $form[] = "\t\t\t</td>";
+            $form[] = "\t\t</tr>";
+            $form[] = "\t\t<tr>";
+            $form[] = "\t</table>";
+            $form[] = "</form>";
+            break;
         case "addntp":
             $form[] = "<form name='add-ntp' method=\"POST\" enctype=\"multipart/form-data\" action=\"" . API_URL . '/v1/addntp.api">';
             $form[] = "\t<table class='add-ntp' id='auth-key' style='vertical-align: top !important; min-width: 98%;'>";
@@ -795,7 +865,7 @@ function getHTMLForm($mode = '', $var = '')
             $form[] = "\t\t</tr>";
             $form[] = "\t\t<tr>";
             $form[] = "\t\t\t<td style='width: 499px;'>";
-            $form[] = "\t\t\t\t<label for='name'>Person's Name:&nbsp;<font style='color: rgb(250,0,0); font-size: 139%; font-weight: bold'>*</font></label>";
+            $form[] = "\t\t\t\t<label for='name'>Telephantist's Name:&nbsp;<font style='color: rgb(250,0,0); font-size: 139%; font-weight: bold'>*</font></label>";
             $form[] = "\t\t\t</td>";
             $form[] = "\t\t\t<td>";
             $form[] = "\t\t\t\t<input type='textbox' name='name' id='name' maxlen='128' size='28' /><br/>";
@@ -804,7 +874,7 @@ function getHTMLForm($mode = '', $var = '')
             $form[] = "\t\t</tr>";
             $form[] = "\t\t<tr>";
             $form[] = "\t\t\t<td style='width: 499px;'>";
-            $form[] = "\t\t\t\t<label for='nameurl'>Person's URL:</label>";
+            $form[] = "\t\t\t\t<label for='nameurl'>Telephantist's URL:</label>";
             $form[] = "\t\t\t</td>";
             $form[] = "\t\t\t<td>";
             $form[] = "\t\t\t\t<input type='textbox' name='nameurl' id='nameurl' maxlen='250'  size='28'/><br/>";
@@ -813,7 +883,7 @@ function getHTMLForm($mode = '', $var = '')
             $form[] = "\t\t</tr>";
             $form[] = "\t\t<tr>";
             $form[] = "\t\t\t<td style='width: 499px;'>";
-            $form[] = "\t\t\t\t<label for='nameemail'>Person's eMail:&nbsp;<font style='color: rgb(250,0,0); font-size: 139%; font-weight: bold'>*</font></label>";
+            $form[] = "\t\t\t\t<label for='nameemail'>Telephantist's eMail:&nbsp;<font style='color: rgb(250,0,0); font-size: 139%; font-weight: bold'>*</font></label>";
             $form[] = "\t\t\t</td>";
             $form[] = "\t\t\t<td>";
             $form[] = "\t\t\t\t<input type='textbox' name='nameemail' id='nameemail' maxlen='196'  size='28'/><br/>";

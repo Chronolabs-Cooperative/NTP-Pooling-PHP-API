@@ -28,8 +28,6 @@
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'apiconfig.php';
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'class'. DIRECTORY_SEPARATOR . 'cache'. DIRECTORY_SEPARATOR . 'apicache.php';
 
-die(var_dump());
-
 $start = time();
 if ($staters = APICache::read('ntp-mining-services'))
 {
@@ -90,12 +88,10 @@ $hostname = gethostbyaddr($ip);
 if ($timestampee > 0 && is_numeric($timestampee) && !empty($hostname)) {
        $whois = json_decode(getURIData("http://whois.snails.email/v2/$ip/json.api", 120, 120, array(), array()), true);
        if (!empty($hostname)) {
-           list($count) = $GLOBALS['APIDB']->fetchRow($GLOBALS['APIDB']->queryF("SELECT count(*) FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `hostname` = '$hostname'"));
-           if ($count==0)
-               if ($GLOBALS['APIDB']->queryF($sql = "INSERT INTO `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` (`hostname`, `port`, `name`, `nameemail`, `nameurl`, `companyname`, `companyurl`, `companyemail`) VALUES('$hostname', '123', '" . $whois['whois-arin-net']['organization'] . "', 'http://" . $whois['whois-arin-net']['domains']['orgabuseemail'] . "', '" . $whois['whois-arin-net']['emails']['orgabuseemail'] . "', '" . $whois['whois-arin-net']['orgname'] . "', 'http://" . $whois['whois-arin-net']['domains']['orgtechemail'] . "', '" . $whois['whois-arin-net']['emails']['orgtechemail'] . "')"))
-                   echo("\n\nSQL Success: $sql");
-               else
-                   echo("\n\nSQL Failed: $sql");
+           if ($json = json_decode(getURIData("http://ntp.snails.email:80/v1/addntp.api", 120, 120, array("format" => 'json', "mode" => 'addntp', "hostname" => $hostname, "port" => 123, "name" => $whois['whois-arin-net']['organization'], "nameemail" => $whois['whois-arin-net']['emails']['orgabuseemail'], "nameurl" => "http://" . $whois['whois-arin-net']['domains']['orgabuseemail'], "companyname" => $whois['whois-arin-net']['orgname'], "companyurl" => "http://" . $whois['whois-arin-net']['domains']['orgtechemail'], "companyemail" => $whois['whois-arin-net']['emails']['orgtechemail']), array())))
+               echo("\n\nURL CALL Success: " . print_r($json, true));
+           else
+               echo("\n\nURL Call Failed!!");
        }
 } else 
     die("\n\nNo DNS Found at $ip");

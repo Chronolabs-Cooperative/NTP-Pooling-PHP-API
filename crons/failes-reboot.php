@@ -1,6 +1,6 @@
 <?php
 /**
- * Email Account Propogation REST Services API
+ * NTP.SNAILS.EMAIL - Pinging Cron
  *
  * You may not change or alter any portion of this comment or credits
  * of supporting developers from this source code or any supporting source code
@@ -22,40 +22,39 @@
  * @link            https://sourceforge.net/p/chronolabs-cooperative
  * @link            https://facebook.com/ChronolabsCoop
  * @link            https://twitter.com/ChronolabsCoop
- * 
+ *
  */
 
+require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'apiconfig.php';
+require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'class'. DIRECTORY_SEPARATOR . 'cache'. DIRECTORY_SEPARATOR . 'apicache.php';
 
-if (!is_file(__DIR__ . DIRECTORY_SEPARATOR . 'mainfile.php') || !is_file(__DIR__ . DIRECTORY_SEPARATOR . 'include' . DIRECTORY_SEPARATOR . 'license.php'))
+$start = time();
+if ($staters = APICache::read('failed-reboot'))
 {
-    header('Location: ' . "./install");
-    exit(0);
+    $staters[] = $start;
+    sort($staters, SORT_ASC);
+    if (count($starters)>50)
+        unset($starters[0]);
+        sort($staters, SORT_ASC);
+        APICache::write('ntp-mining-services', $staters, 3600 * 24 * 7 * 4 * 6);
+        $keys = array_key(array_reverse($starters));
+        $avg = array();
+        foreach(array_reverse($starters) as $key => $starting) {
+            if (isset($keys[$key - 1])) {
+                $avg[] = abs($starting - $starters[$keys[$key - 1]]);
+            }
+        }
+        if (count($avg) > 0 ) {
+            foreach($avg as $average)
+                $seconds += $average;
+                $seconds = $seconds / count($avg);
+        } else
+            $seconds = 1800;
+} else {
+    APICache::write('failed-reboot', array(0=>$start), 3600 * 24 * 7 * 4 * 6);
+    $seconds = 1800;
 }
 
-require_once __DIR__ . DIRECTORY_SEPARATOR . 'mainfile.php';
-require_once __DIR__ . DIRECTORY_SEPARATOR . 'include' . DIRECTORY_SEPARATOR . 'functions.php';
-
-/**
- * Opens Access Origin Via networking Route NPN
- */
-header('Access-Control-Allow-Origin: *');
-header('Origin: *');
-
-/**
- * Turns of GZ Lib Compression for Document Incompatibility
- */
-ini_set("zlib.output_compression", 'Off');
-ini_set("zlib.output_compression_level", -1);
-
-/**
- * 
- * @var constants
- */
-define('API_CACHE_SECONDS', 93);
-
-// Seeds the random
-mt_srand(mt_rand(time(), microtime(true) * time() * time()));
-mt_srand(mt_rand(time(), microtime(true) * time() * time()));
-mt_srand(mt_rand(time(), microtime(true) * time() * time()));
-mt_srand(mt_rand(time(), microtime(true) * time() * time()));
-srand(mt_rand(time(), microtime(true) * time() * time()));
+$html = getURIData('http://ntp.snails.email');
+if (strpos($html, 'Unable to connect to database'))
+    shell_exec('reboot');

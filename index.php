@@ -78,8 +78,13 @@
 	        $help = true;
 	        break;
 	    case 'addntp':
-	        if (!empty($inner['hostname']) && !empty($inner['port']) && !empty($inner['name']) && !empty($inner['nameemail']))
-	           $data = addNTP($inner['hostname'], $inner['port'], $inner['name'], $inner['nameemail'], $inner['nameurl'], $inner['companyname'], $inner['companyemail'], $inner['companyrbn'], $inner['companyrbntype'], $inner['companytype'], $inner['companyurl'], $inner['format']);
+	        if ((isset($_REQUEST['skiphost']) && ($_REQUEST['skiphost'] == true)) || getHostnamePing($inner['hostname']) > 0) {
+    	        if (!empty($inner['hostname']) && !empty($inner['port']) && !empty($inner['name']) && !empty($inner['nameemail']))
+    	           $data = addNTP($inner['hostname'], $inner['port'], $inner['name'], $inner['nameemail'], $inner['nameurl'], $inner['companyname'], $inner['companyemail'], $inner['companyrbn'], $inner['companyrbntype'], $inner['companytype'], $inner['companyurl'], $inner['format']);
+	           else
+	               $data = array('code'=>501, 'errors' => array(203 => 'Hostname, port, name or name email address is blank and empty!'));
+	        } else
+	            $data = array('code'=>501, 'errors' => array(202 => 'Hostname is not pingable'));
 	        break;
 	    case 'editntp':
 	        if (!empty($inner['hostname']) && !empty($inner['port']) && !empty($inner['name']) && !empty($inner['nameemail']))
@@ -174,4 +179,3 @@
 			break;
 	}
 	exit(0);
-?>
