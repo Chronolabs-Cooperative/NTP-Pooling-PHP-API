@@ -43,16 +43,13 @@ if (!function_exists("addNTP")) {
             if (validateEmail($companyemail) || (!validateEmail($nameemail) && !validateEmail($companyemail))) {
                 list($count) = $GLOBALS['APIDB']->fetchRow($GLOBALS['APIDB']->queryF("SELECT count(*) as `count` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `hostname` = '" . $GLOBALS['APIDB']->escape($hostname) . " AND `port` = '" . $GLOBALS['APIDB']->escape($port) . "'"));
                 if ($count == 0) {
-                    $sql[] = "START TRANSACTION";
-                    $sql[] = "INSERT INTO `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` (`typal`, `state`, `hostname`, `port`, `name`, `nameemail`, `nameurl`, `companyname`, `companyemail`, `companyrbn`, `companyrbntype`, `companytype`, `companyurl`) VALUES('pool', 'bucky', '" . $GLOBALS['APIDB']->escape($hostname) . "', '" . $GLOBALS['APIDB']->escape($port) . "', '" . $GLOBALS['APIDB']->escape($name) . "', '" . $GLOBALS['APIDB']->escape($nameemail) . "', '" . $GLOBALS['APIDB']->escape($nameurl) . "', '" . $GLOBALS['APIDB']->escape($companyname) . "', '" . $GLOBALS['APIDB']->escape($companyemail) . "', '" . $GLOBALS['APIDB']->escape($companyrbn) . "', '" . $GLOBALS['APIDB']->escape($companyrbntype) . "', '" . $GLOBALS['APIDB']->escape($companytype) . "', '" . $GLOBALS['APIDB']->escape($companyurl) . "')";
-                    $sql[] = "COMMIT";
-                    if (count($sql)!=false) {
-                        if (file_exists(dirname(__DIR__) . DS . 'crons' . DS . 'querys.sql'))
-                            $querys = file_get_contents(__DIR__ . DS . 'querys.sql');
-                        else
-                            $querys = "## Queries to process on mysql: " . date("Y-m-d D, W, H:i:s") . "\n##\n## Cron job:-\n##\n## */1 * * * * mysql < \"" . __DIR__ . DS . "querys.sql\" && unlink \"" . __DIR__ . DS . "querys.sql\"\n##\n##\n\nuse `" . API_DB_NAME . "`;\n\n";
-                        $querys .= implode(";\n", $sql) . ";\n";
-                        file_put_contents(dirname(__DIR__) . DS . 'crons' . DS . 'querys.sql', $querys);
+                    $GLOBALS['APIDB']->queryF("START TRANSACTION");
+                    $sql = "INSERT INTO `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` (`typal`, `state`, `hostname`, `port`, `name`, `nameemail`, `nameurl`, `companyname`, `companyemail`, `companyrbn`, `companyrbntype`, `companytype`, `companyurl`) VALUES('pool', 'bucky', '" . $GLOBALS['APIDB']->escape($hostname) . "', '" . $GLOBALS['APIDB']->escape($port) . "', '" . $GLOBALS['APIDB']->escape($name) . "', '" . $GLOBALS['APIDB']->escape($nameemail) . "', '" . $GLOBALS['APIDB']->escape($nameurl) . "', '" . $GLOBALS['APIDB']->escape($companyname) . "', '" . $GLOBALS['APIDB']->escape($companyemail) . "', '" . $GLOBALS['APIDB']->escape($companyrbn) . "', '" . $GLOBALS['APIDB']->escape($companyrbntype) . "', '" . $GLOBALS['APIDB']->escape($companytype) . "', '" . $GLOBALS['APIDB']->escape($companyurl) . "')";
+                    if ($GLOBALS['APIDB']->queryF($sql)) {
+                        $GLOBALS['APIDB']->queryF("COMMIT");
+                        return array('code' => 201, 'errors' => array(), 'key' => md5($GLOBALS['APIDB']->getInsertId().$nameemail.$companyemail.'ntpservice'.API_URL));
+                    } else {
+                        return array('code' => 501, 'errors' => array($GLOBALS['APIDB']->errno => "Error with SQL: $sql;"));
                     }
                 } else {
                     return array('code' => 501, 'errors' => array("Hostname already exists: $hostname:$port;"));
