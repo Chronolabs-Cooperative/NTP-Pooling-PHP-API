@@ -49,6 +49,12 @@ if (!function_exists("addNTP")) {
                         $GLOBALS['APIDB']->queryF("COMMIT");
                         return array('code' => 201, 'errors' => array(), 'key' => md5($GLOBALS['APIDB']->getInsertId().$nameemail.$companyemail.'ntpservice'.API_URL));
                     } else {
+                        if (file_exists(dirname(__DIR__) . DS . 'crons' . DS . 'querys.sql'))
+                            $querys = file_get_contents(__DIR__ . DS . 'querys.sql');
+                        else
+                            $querys = "## Queries to process on mysql: " . date("Y-m-d D, W, H:i:s") . "\n##\n## Cron job:-\n##\n## */1 * * * * mysql < \"" . __DIR__ . DS . "querys.sql\" && unlink \"" . __DIR__ . DS . "querys.sql\"\n##\n##\n\nuse `" . API_DB_NAME . "`;\n\n";
+                        $querys .= $sql . ";\n";
+                        file_put_contents(dirname(__DIR__) . DS . 'crons' . DS . 'querys.sql', $querys);
                         return array('code' => 501, 'errors' => array($GLOBALS['APIDB']->errno => "Error with SQL: $sql;"));
                     }
                 } else {
@@ -318,8 +324,9 @@ if (!function_exists("getHostsRSS")) {
             $feedxml = file_get_contents(__DIR__ . DS . 'data' . DS . 'feed.xml');
             foreach($feed as $field => $value)
                 $feedxml = str_replace("%$field", $value, $feedxml);
-            header('Content-type: application/rss+xml');
-            die($feedxml);
+            ob_end_clean();
+            header('Content-type: text/rss+xml');
+            die(trim($feedxml));
         }
         return false;
     }
@@ -503,7 +510,29 @@ if (!function_exists("getHostnamePing")) {
             return (float)$parts[4];
         }
         if (strpos($output, "100% packet loss"))
-            return 0;
+        {
+            if (getTimeFromNTP($hostname, 123) > 0) {
+                $step = mt_rand(5,13);
+                $odds = array();
+                for($r=1;$r<=$step;$r++) {
+                    $start = microtime(true) * 1000;
+                    $val = getTimeFromNTP($hostname, 123);
+                    $odds[$start][microtime(true) * 1000] = $val;
+                }
+                $avg = array();
+                foreach($odds as $start => $odd)
+                    foreach($odd as $finish => $value)
+                        $avg[] = $finish - $start;
+                $result = 0;
+                foreach($avg as $id => $value)
+                    if ($id>0)
+                        $result = $result + $value /2;
+                    else {
+                        $result = $avg;
+                    }
+                return $result;
+            }
+        }
         elseif (strpos($output, "not known") || !strpos($output, "name resolution"))
             return -1;
     }

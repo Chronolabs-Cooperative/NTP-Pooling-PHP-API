@@ -15,7 +15,7 @@
             <url>%image_url</url>
             <width>%image_width</width>
             <height>%image_height</height>
-        </image>
+        </image><items>
         %items
-    </channel>
+        </items></channel>
 </rss>
