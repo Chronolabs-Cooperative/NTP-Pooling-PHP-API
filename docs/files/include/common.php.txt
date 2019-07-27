@@ -24,6 +24,7 @@
  * @link            https://twitter.com/ChronolabsCoop
  * 
  */
+ini_set('memory_limit', '150M');
 
 defined('API_MAINFILE_INCLUDED') || die('Restricted access');
 

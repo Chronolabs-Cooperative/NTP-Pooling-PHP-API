@@ -45,11 +45,11 @@ define('API_DB_HOST', 'localhost');
 
 // Database Username
 // Your database user account on the host
-define('API_DB_USER', 'wishcraft');
+define('API_DB_USER', '');
 
 // Database Password
 // Password for your database user account
-define('API_DB_PASS', 'n0bux5t||||-');
+define('API_DB_PASS', '');
 
 // Database Name
 // The name of database on the host. The installer will attempt to create the database if not exist

@@ -89,7 +89,7 @@
 <body>
 <div class="main">
 	<img style="float: right; margin: 11px; width: auto; height: auto; clear: none;" src="<?php echo API_URL; ?>/assets/images/logo_350x350.png" />
-    <h1><?php echo API_VERSION; ?> -- <?php echo API_LICENSE_COMPANY; ?></h1>
+    <h1><?php echo API_URL; ?> -- <?php echo API_LICENSE_COMPANY; ?></h1>
     <p>As an API, this allows you to anonymously without authentication add either IPv4, IPv6 or Network Netbios Hostnames for NTP Time based services on the internet and the wider worlds of networking.</p>
 	<h2>Code API Documentation</h2>
     <p>You can find the phpDocumentor code API documentation at the following path :: <a href="<?php echo API_URL . '/'; ?>docs/" target="_blank"><?php echo API_URL . '/'; ?>docs/</a>. These should outline the source code core functions and classes for the API to function!</p>
@@ -131,7 +131,7 @@ fi
 ####################################################<?php echo date("[ Y-m-d W.y, D, H:i:s ]");?>######
     </pre>
     <h2>RSS Document Output</h2>
-    <p>This is done with the <em>???.rss</em> extension at the end of the url.</p>
+    <p>This is done with the <em>command.rss</em> extension at the end of the url.</p>
     <blockquote>
         <font class="help-title-text">This provides a RSS Feed of the top ntp.snail.email providers, pools and servers</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/top.rss?20" target="_blank"><?php echo API_URL . '/'; ?>v1/top.rss?20</a></font><br /><br />
@@ -141,7 +141,7 @@ fi
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/new.rss?20" target="_blank"><?php echo API_URL . '/'; ?>v1/new.rss?20</a></font><br /><br />
     </blockquote>
     <h2>PHP Document Output</h2>
-    <p>This is done with the <em>command.json</em> extension at the end of the url.</p>
+    <p>This is done with the <em>command.php</em> extension at the end of the url.</p>
     <blockquote>
         <font class="help-title-text">This provides a list and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/online.php" target="_blank"><?php echo API_URL . '/'; ?>v1/online.php</a></font><br /><br />
@@ -155,6 +155,22 @@ fi
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/downtime.php" target="_blank"><?php echo API_URL . '/'; ?>v1/downtime.php</a></font><br /><br />
         <font class="help-title-text">This provides a list and keys of defined in the offline.php/online.php api call as well as the next time the key is due to be pinged by timeout (least to greatest)</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/nextping.php" target="_blank"><?php echo API_URL . '/'; ?>v1/nextping.php</a></font><br /><br />
+    </blockquote>
+    <h2>ASP Document Output</h2>
+    <p>This is done with the <em>command.asp</em> extension at the end of the url.</p>
+    <blockquote>
+        <font class="help-title-text">This provides a list and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/online.asp" target="_blank"><?php echo API_URL . '/'; ?>v1/online.asp</a></font><br /><br />
+        <font class="help-title-text">This provides a list and keys of defined NTP Source tested to currently be offline from host on the service</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/offline.asp" target="_blank"><?php echo API_URL . '/'; ?>v1/offline.asp</a></font><br /><br />
+        <font class="help-title-text">This provides a list and keys of defined in the offline.asp/online.asp api call as well as the ping time (least to greatest)</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/pings.asp" target="_blank"><?php echo API_URL . '/'; ?>v1/pings.asp</a></font><br /><br />
+        <font class="help-title-text">This provides a list and keys of defined in the offline.asp/online.asp api call as well as the up-time (least to greatest)</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/uptime.asp" target="_blank"><?php echo API_URL . '/'; ?>v1/uptime.asp</a></font><br /><br />
+        <font class="help-title-text">This provides a list and keys of defined in the offline.asp/online.asp api call as well as the down-time (least to greatest)</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/downtime.asp" target="_blank"><?php echo API_URL . '/'; ?>v1/downtime.asp</a></font><br /><br />
+        <font class="help-title-text">This provides a list and keys of defined in the offline.asp/online.asp api call as well as the next time the key is due to be pinged by timeout (least to greatest)</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/nextping.asp" target="_blank"><?php echo API_URL . '/'; ?>v1/nextping.asp</a></font><br /><br />
     </blockquote>
     <h2>Serialisation Document Output</h2>
     <p>This is done with the <em>command.serial</em> extension at the end of the url.</p>
@@ -173,7 +189,7 @@ fi
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/nextping.serial" target="_blank"><?php echo API_URL . '/'; ?>v1/nextping.serial</a></font><br /><br />
     </blockquote>
     <h2>JSON Document Output</h2>
-    <p>This is done with the <em>json.api</em> extension at the end of the url, you replace the address with either a domain, an IPv4 or IPv6 address the following example is of calls to the api</p>
+    <p>This is done with the <em>command.json</em> extension at the end of the url, you replace the address with either a domain, an IPv4 or IPv6 address the following example is of calls to the api</p>
     <blockquote>
         <font class="help-title-text">This provides a list and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/online.json" target="_blank"><?php echo API_URL . '/'; ?>v1/online.json</a></font><br /><br />
@@ -189,7 +205,7 @@ fi
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/nextping.json" target="_blank"><?php echo API_URL . '/'; ?>v1/nextping.json</a></font><br /><br />
 	</blockquote>
     <h2>XML Document Output</h2>
-    <p>This is done with the <em>xml.api</em> extension at the end of the url, you replace the address with either a domain, an IPv4 or IPv6 address the following example is of calls to the api</p>
+    <p>This is done with the <em>command.xml</em> extension at the end of the url, you replace the address with either a domain, an IPv4 or IPv6 address the following example is of calls to the api</p>
     <blockquote>
         <font class="help-title-text">This provides a list and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/online.xml" target="_blank"><?php echo API_URL . '/'; ?>v1/online.xml</a></font><br /><br />

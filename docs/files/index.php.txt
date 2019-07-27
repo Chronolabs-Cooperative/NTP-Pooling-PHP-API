@@ -78,8 +78,13 @@
 	        $help = true;
 	        break;
 	    case 'addntp':
-	        if (!empty($inner['hostname']) && !empty($inner['port']) && !empty($inner['name']) && !empty($inner['nameemail']))
-	           $data = addNTP($inner['hostname'], $inner['port'], $inner['name'], $inner['nameemail'], $inner['nameurl'], $inner['companyname'], $inner['companyemail'], $inner['companyrbn'], $inner['companyrbntype'], $inner['companytype'], $inner['companyurl'], $inner['format']);
+	        if ((isset($_REQUEST['skiphost']) && ($_REQUEST['skiphost'] == true)) || getHostnamePing($inner['hostname']) > 0) {
+    	        if (!empty($inner['hostname']) && !empty($inner['port']) && !empty($inner['name']) && !empty($inner['nameemail']))
+    	           $data = addNTP($inner['hostname'], $inner['port'], $inner['name'], $inner['nameemail'], $inner['nameurl'], $inner['companyname'], $inner['companyemail'], $inner['companyrbn'], $inner['companyrbntype'], $inner['companytype'], $inner['companyurl'], $inner['format']);
+	           else
+	               $data = array('code'=>501, 'errors' => array(203 => 'Hostname, port, name or name email address is blank and empty!'));
+	        } else
+	            $data = array('code'=>501, 'errors' => array(202 => 'Hostname is not pingable'));
 	        break;
 	    case 'editntp':
 	        if (!empty($inner['hostname']) && !empty($inner['port']) && !empty($inner['name']) && !empty($inner['nameemail']))
@@ -113,6 +118,8 @@
 	 * Buffers Help
 	 */
 	if ($help==true) {
+		if ($_SERVER['REQUEST_URI']!='/index.html')
+			die(header("Location: " . API_URL . '/index.html'));
 		if (function_exists("http_response_code"))
 			http_response_code(400);
 		include dirname(__FILE__).'/help.php';
@@ -141,6 +148,7 @@
 		}
 	}
 	
+	ob_end_clean();
 	/**
 	 * Commences Execution of API Functions
 	 */
@@ -155,7 +163,10 @@
 			echo var_dump($data, true);
 			echo '</pre>';
 			break;
-		case 'raw':
+		case 'asp':
+		    echo convertPHP2ASP("<?php\n\n \$" . $inner['mode'] . " = " . var_export($data, true) . ";\n\n?>");
+		    break;
+		case 'php':
 			echo "<?php\n\n return " . var_export($data, true) . ";\n\n?>";
 			break;
 		case 'json':
@@ -174,5 +185,4 @@
 			break;
 	}
 	exit(0);
-?>
 

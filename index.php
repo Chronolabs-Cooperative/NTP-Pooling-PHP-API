@@ -118,6 +118,8 @@
 	 * Buffers Help
 	 */
 	if ($help==true) {
+		if ($_SERVER['REQUEST_URI']!='/index.html')
+			die(header("Location: " . API_URL . '/index.html'));
 		if (function_exists("http_response_code"))
 			http_response_code(400);
 		include dirname(__FILE__).'/help.php';
@@ -146,6 +148,7 @@
 		}
 	}
 	
+	ob_end_clean();
 	/**
 	 * Commences Execution of API Functions
 	 */
@@ -160,7 +163,10 @@
 			echo var_dump($data, true);
 			echo '</pre>';
 			break;
-		case 'raw':
+		case 'asp':
+		    echo convertPHP2ASP("<?php\n\n \$" . $inner['mode'] . " = " . var_export($data, true) . ";\n\n?>");
+		    break;
+		case 'php':
 			echo "<?php\n\n return " . var_export($data, true) . ";\n\n?>";
 			break;
 		case 'json':

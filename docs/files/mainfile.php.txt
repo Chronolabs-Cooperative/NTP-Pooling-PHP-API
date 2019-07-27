@@ -57,7 +57,7 @@ if (!defined('API_MAINFILE_INCLUDED')) {
     if (isset($_SERVER['HTTP_HOST']))
         define('API_URL', API_PROT . $_SERVER['HTTP_HOST'] . ':' . $_SERVER['SERVER_PORT']);
     else 
-        define('API_URL', 'http://ntp.snails.email.localhost:80');
+        define('API_URL', 'http://172.104.177.252:80');
 
     // API Cookie Domain to specify when creating cookies. May be blank (i.e. for IP address host),
     // full host from API_URL (i.e. www.example.com) or just the registered domain (i.e. example.com)
@@ -65,7 +65,7 @@ if (!defined('API_MAINFILE_INCLUDED')) {
     if (isset($_SERVER['HTTP_HOST']))
         define('API_COOKIE_DOMAIN', $_SERVER['HTTP_HOST']);
     else 
-        define('API_COOKIE_DOMAIN', '.ntp.snails.email.localhost');
+        define('API_COOKIE_DOMAIN', '.ntp.snails.email');
 
     // Shall be handled later, don't forget!
     define('API_CHECK_PATH', 0);

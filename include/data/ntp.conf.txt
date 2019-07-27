@@ -21,16 +21,18 @@
 ##
 
 # Enable this if you want statistics to be logged.
-statsdir /var/log/ntpstats/
-statistics loopstats peerstats clockstats
-filegen loopstats file loopstats type day enable
-filegen peerstats file peerstats type day enable
-filegen clockstats file clockstats type day enable
+statistics loopstats
+statsdir /var/log/ntp/
+filegen peerstats file peers type day link enable
+filegen loopstats file loops type day link enable
+filegen clockstats file clocks type day link enable
 
 # Specify one or more NTP pools + servers.
 %pools
 %servers
-server ntp.snails.email
+### server ntp.snails.email
+### server ubuntu.ntp.org
+### server pool.ntp.org
 
-##### Generated: YYYY/MM/DD HH:II:SS ####### SOURCE URL: %url ####### SOURCE IP: %ip ########
+##### Generated: YYYY/MM/DD HH:II:SS ####### SOURCE URL: %url ###############
 ###################################################################################################################################################################

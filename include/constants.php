@@ -25,3 +25,15 @@
  * 
  */
 
+define('API_ZONE_URL', 'http://zones.vps-a.snails.email');
+define('API_ZONE_USERNAME', '');
+define('API_ZONE_PASSWORD', '');
+define('API_ZONE_DOMAIN', 'snails.email');
+define('API_ZONE_SUBDOMAIN', '%s.%s.ntp.snails.email');
+define('API_ZONE_AUTHKEY', '%apiurl/v1/authkey.api');
+define('API_ZONE_DOMAINKEYS', '%apiurl/v1/%authkey/domains/json.api');
+define('API_ZONE_DNSRECORDS', '%apiurl/v1/%authkey/%domainkey/zones/json.api');
+define('API_ZONE_EDITRECORD', '%apiurl/v1/%authkey/%recordkey/edit/zone/json.api');
+define('API_ZONE_DELETERECORD', '%apiurl/v1/%authkey/%recordkey/delete/zone/json.api');
+define('API_ZONE_ADDRECORD', '%apiurl/v1/%authkey/zones.api');
+define('API_ZONE_CNAMETYPE', 'CNAME');

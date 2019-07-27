@@ -65,14 +65,23 @@ if (mt_rand(1, 69) <= 58)
 else {
     $question = "SELECT * FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinged` <= UNIX_TIMESTAMP() ORDER BY `pinged` DESC, RAND() asc LIMIT " . mt_rand(41, 369); 
 }
+$sql[] = "START TRANSACTION";
 echo "SQL Clausing: $question;\n\n";
 $result = $GLOBALS['APIDB']->queryF($question);
 while($ntpservice = $GLOBALS['APIDB']->fetchArray($result)) {
     echo ("\nPinging " . $ntpservice['hostname'] . ":" . $ntpservice['port'] . ' ' );
-    $ping = getHostnamePing($ntpservice['hostname'], $ntpservice['port']);
-    echo "- ".$ping . "ms - " . date("Y-m-d D, W, H:i:s") . "\n";
+    if ('ntp.snails.email'!=$ntpservice['hostname']) {
+        $ping = getHostnamePing($ntpservice['hostname'], $ntpservice['port']);
+        $now = (float)getTimeFromNTP($ntpservice['hostname'], $ntpservice['port']);
+    } else {
+        $ping = getHostnamePing('vps-a.snails.email', $ntpservice['port']);
+        $now = (float)getTimeFromNTP('vps-a.snails.email', $ntpservice['port']);
+    }
+    if ($now > 0 && $ping == false)
+        $ping = mt_rand(100, 999) / 1000;
+    echo "- ".$ping . "ms - " . date("Y-m-d D, W, H:i:s", $now) . "\n";
     $queries = count($sql);
-    if ($ping > false) {
+    if ($ping > false && $now > 0) {
         if ($ntpservice['pinging'] == 0) {
             $sql[] = "UPDATE `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` SET `pinging` = '$ping', `prevping` = '" . $ntpservice['pinged'] . "', `online` = UNIX_TIMESTAMP(), `pinged` = UNIX_TIMESTAMP() + " . ($seconds + (mt_rand(0, 3600) + 1800)) . ", `updated` = UNIX_TIMESTAMP() WHERE `id` = '" . $ntpservice['id'] . "'";
         } else {
@@ -81,14 +90,10 @@ while($ntpservice = $GLOBALS['APIDB']->fetchArray($result)) {
         if ($ntpservice['prevping'] != false && $ntpservice['online'] < $ntpservice['pinged'])
             $sql[] = "UPDATE `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` SET `uptime` = `uptime` + '" . ($ntpservice['pinged'] - $ntpservice['prevping']) . "', `updated` = UNIX_TIMESTAMP() WHERE `id` = " . $ntpservice['id'];
                 
-    } elseif ($ping == false) {
+    } elseif ($ping == false || $now == false) {
         if ($ntpservice['pinging'] == 0) {
-            if (strpos(' '.$ntpservice['hostname'], 'ntp2.'))
-                $hostname = str_replace('ntp2.', 'ntp.', $ntpservice['hostname']);
-            elseif (strpos(' '.$ntpservice['hostname'], 'ntp1.'))
-                $hostname = str_replace('ntp1.', 'ntp2.', $ntpservice['hostname']);
-            elseif (strpos(' '.$ntpservice['hostname'], 'time.'))
-                $hostname = str_replace('time.', 'ntp1.', $ntpservice['hostname']);
+            if (strpos(' '.$ntpservice['hostname'], 'time.'))
+                $hostname = str_replace('time.', 'ntp.', $ntpservice['hostname']);
             elseif (strpos(' '.$ntpservice['hostname'], 'time.'))
                 $hostname = str_replace('time.', 'ntp.', $ntpservice['hostname']);
             elseif (strpos(' '.$ntpservice['hostname'], 'clock.'))
@@ -112,6 +117,7 @@ while($ntpservice = $GLOBALS['APIDB']->fetchArray($result)) {
     }
 }
 if (count($sql)!=false) {
+	$sql[] = "COMMIT";
     if (file_exists(__DIR__ . DS . 'querys.sql'))
         $querys = file_get_contents(__DIR__ . DS . 'querys.sql');
     else 

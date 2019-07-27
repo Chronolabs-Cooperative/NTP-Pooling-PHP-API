@@ -26,6 +26,9 @@
  */
 
 
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'functions.php2asp.php';
+
+
 if (!function_exists("formatRssTimestamp")) {
     function formatRssTimestamp($time)
     {
@@ -38,7 +41,7 @@ if (!function_exists("addNTP")) {
 
     function addNTP($hostname, $port, $name, $nameemail, $nameurl, $companyname, $companyemail, $companyrbn, $companyrbntype, $companytype, $companyurl, $format) 
     {
-   
+        require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'class' . DIRECTORY_SEPARATOR . 'apimailer.php';
         if (validateEmail($nameemail) || (!validateEmail($nameemail) && !validateEmail($companyemail))) {
             if (validateEmail($companyemail) || (!validateEmail($nameemail) && !validateEmail($companyemail))) {
                 list($count) = $GLOBALS['APIDB']->fetchRow($GLOBALS['APIDB']->queryF("SELECT count(*) as `count` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `hostname` = '" . $GLOBALS['APIDB']->escape($hostname) . " AND `port` = '" . $GLOBALS['APIDB']->escape($port) . "'"));
@@ -47,14 +50,38 @@ if (!function_exists("addNTP")) {
                     $sql = "INSERT INTO `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` (`typal`, `state`, `hostname`, `port`, `name`, `nameemail`, `nameurl`, `companyname`, `companyemail`, `companyrbn`, `companyrbntype`, `companytype`, `companyurl`) VALUES('pool', 'bucky', '" . $GLOBALS['APIDB']->escape($hostname) . "', '" . $GLOBALS['APIDB']->escape($port) . "', '" . $GLOBALS['APIDB']->escape($name) . "', '" . $GLOBALS['APIDB']->escape($nameemail) . "', '" . $GLOBALS['APIDB']->escape($nameurl) . "', '" . $GLOBALS['APIDB']->escape($companyname) . "', '" . $GLOBALS['APIDB']->escape($companyemail) . "', '" . $GLOBALS['APIDB']->escape($companyrbn) . "', '" . $GLOBALS['APIDB']->escape($companyrbntype) . "', '" . $GLOBALS['APIDB']->escape($companytype) . "', '" . $GLOBALS['APIDB']->escape($companyurl) . "')";
                     if ($GLOBALS['APIDB']->queryF($sql)) {
                         $GLOBALS['APIDB']->queryF("COMMIT");
-                        return array('code' => 201, 'errors' => array(), 'key' => md5($GLOBALS['APIDB']->getInsertId().$nameemail.$companyemail.'ntpservice'.API_URL));
+                        $ntpid = $GLOBALS['APIDB']->getInsertId();
+                        $sql = "SELECT * FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `id` = $ntpid";
+                        $result = $GLOBALS['APIDB']->queryF($sql);
+                        $ntpservice = $GLOBALS['APIDB']->fetchArray($result);
+                        $tmpplate = array();
+                        $ntpservice['key'] = md5($ntpservice['id'].$ntpservice['nameemail'].$ntpservice['companyemail'].'ntpservice'.API_URL);
+                        $ntpservice['form'] = getHTMLForm('editntp', $ntpservice);
+                        $ntpservice['api_url'] = API_URL;
+                        $ntpservice['pinging'] = number_format($ntpservice['pinging'], 2) . 'ms';
+                        $tmpplate['admin'] = $ntpservice['state'];
+                        foreach(array('pinged', 'prevping', 'emailed', 'reportnext', 'reportlast', 'online', 'offline', 'updated') as $field)
+                            $ntpservice[$field] = date("Y-m-d, W, D, H:i:s", $ntpservice[$field]);
+                        foreach(array('uptime', 'downtime') as $field) {
+                            if ($ntpservice[$field]==1)
+                                $ntpservice[$field] = 0;
+                                $ntpservice[$field] = formatMSASTime($ntpservice[$field] * 1000);
+                        }
+                        $mailer = new APIMailer("chronolabscoop@users.sourceforge.net", "Chronolabs Coop (ntp.snails.email)");
+                        $body = file_get_contents(__DIR__ . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'email__service_added.html');
+                        $subject = sprintf("Added %s - to %s - Network Transit Protocol (NTP)", $ntpservice['hostname'], API_URL);
+                        foreach($ntpservice as $field => $value)
+                            $body = str_replace("%$field", $value, $body);
+                        if ($mailer->sendMail(array($ntpservice['companyemail'] => $ntpservice['companyname']), array($ntpservice['nameemail'] => $ntpservice['name']), array('chronolabcoop@outlook.com' => 'Chronolabs Coop (BCC)'), $subject, $body, array(dirname(__DIR__) . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'docs' . DIRECTORY_SEPARATOR . 'Organisational Timing-bell.pdf', dirname(__DIR__) . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'docs' . DIRECTORY_SEPARATOR . 'Organisational Timing-bell.docx', dirname(__DIR__) . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'docs' . DIRECTORY_SEPARATOR . 'Organisational Timing-bell.odt'), array(), true )) 
+                            @$GLOBALS['APIDB']->queryF($sql = "UPDATE `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` SET `uptime` = 0, `downtime` = 0, `emailed` = UNIX_TIMESTAMP(), `updated` = UNIX_TIMESTAMP() WHERE `id` = '" . $ntpid . "'");
+                        return array('code' => 201, 'errors' => array(), 'key' => md5($ntpid.$nameemail.$companyemail.'ntpservice'.API_URL));
                     } else {
-                        if (file_exists(dirname(__DIR__) . DS . 'crons' . DS . 'querys.sql'))
-                            $querys = file_get_contents(__DIR__ . DS . 'querys.sql');
+                        if (file_exists(dirname(__DIR__) . DIRECTORY_SEPARATOR . 'crons' . DIRECTORY_SEPARATOR . 'querys.sql'))
+                            $querys = file_get_contents(__DIR__ . DIRECTORY_SEPARATOR . 'querys.sql');
                         else
-                            $querys = "## Queries to process on mysql: " . date("Y-m-d D, W, H:i:s") . "\n##\n## Cron job:-\n##\n## */1 * * * * mysql < \"" . __DIR__ . DS . "querys.sql\" && unlink \"" . __DIR__ . DS . "querys.sql\"\n##\n##\n\nuse `" . API_DB_NAME . "`;\n\n";
+                            $querys = "## Queries to process on mysql: " . date("Y-m-d D, W, H:i:s") . "\n##\n## Cron job:-\n##\n## */1 * * * * mysql < \"" . __DIR__ . DIRECTORY_SEPARATOR . "querys.sql\" && unlink \"" . __DIR__ . DIRECTORY_SEPARATOR . "querys.sql\"\n##\n##\n\nuse `" . API_DB_NAME . "`;\n\n";
                         $querys .= $sql . ";\n";
-                        file_put_contents(dirname(__DIR__) . DS . 'crons' . DS . 'querys.sql', $querys);
+                        file_put_contents(dirname(__DIR__) . DIRECTORY_SEPARATOR . 'crons' . DIRECTORY_SEPARATOR . 'querys.sql', $querys);
                         return array('code' => 501, 'errors' => array($GLOBALS['APIDB']->errno => "Error with SQL: $sql;"));
                     }
                 } else {
@@ -139,40 +166,83 @@ if (!function_exists("getHostsKeys")) {
     
     function getHostsKeys($mode, $format) 
     {
-
-        switch ($mode) {
-            case 'online':
-                $sql = "SELECT *, md5(concat(`id`,'ntpservice','".API_URL."')) as `key` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinging` > 0 AND `uptime` > `downtime` AND `uptime` > 0 ORDER BY `pinging` DESC";
-                break;
-            case 'offline':
-                $sql = "SELECT *, md5(concat(`id`,'ntpservice','".API_URL."')) as `key` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinging` = 0 AND `uptime` <= `downtime` ORDER BY `downtime` DESC";
-                break;
-        }
-        $mb = 82;
-        $results = array();
-        $result = $GLOBALS['APIDB']->queryF($sql);
-        while($row = $GLOBALS['APIDB']->fetchArray($result))
-        {
-            $key = nef($row['hostname']);
-            unset($row['state']);
-            unset($row['id']);
-            $row['nameemail'] = checkEmail($row['nameemail'], true);
-            $row['companyemail'] = checkEmail($row['companyemail'], true);
-            foreach(array('pinged', 'prevping', 'emailed', 'reportnext', 'reportlast', 'online', 'offline', 'updated') as $field)
-                if (!empty($row[$field]))
-                    $row[$field] = date('Y-m-d, D, H:i:s', $row[$field]);
-                else 
-                    unset($row[$field]);
-            foreach(array('uptime', 'downtime') as $field)
-                if (!empty($row[$field]))
-                    $row[$field] = formatMSASTime($row[$field]);
-                else
-                    unset($row[$field]);
-            $mb = $mb + ((strlen(json_encode($row)) / (1024 * 1024 * 1024)) * 2);
-            ini_set('memory_limit', floor($mb) . 'M');
-            if (!isset($results[$key]))
-                $results[$key] = $row;
+        if ($memory = APICache::read('memory-state-'.$mode))
+            if (isset($memory['limit']) && !empty($memory['limit']))
+                ini_set('memory_limit', $memory['limit']);
             
+        if (!$results = APICache::read('state-'.$mode)) {
+            switch ($mode) {
+                case 'online':
+                    $sql = "SELECT *, md5(concat(`id`,'ntpservice','".API_URL."')) as `key` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinging` > 0 AND `uptime` > `downtime` AND `uptime` > 0 ORDER BY `pinging` DESC";
+                    break;
+                case 'offline':
+                    $sql = "SELECT *, md5(concat(`id`,'ntpservice','".API_URL."')) as `key` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinging` = 0 AND `uptime` <= `downtime` ORDER BY `downtime` DESC";
+                    break;
+            }
+            $mb = 82;
+            $memory = $results = array();
+            $result = $GLOBALS['APIDB']->queryF($sql);
+            while($row = $GLOBALS['APIDB']->fetchArray($result))
+            {
+                $key = nef($row['hostname']);
+                unset($row['state']);
+                unset($row['id']);
+                $row['nameemail'] = checkEmail($row['nameemail'], true);
+                $row['companyemail'] = checkEmail($row['companyemail'], true);
+                foreach(array('pinged', 'prevping', 'emailed', 'reportnext', 'reportlast', 'online', 'offline', 'updated') as $field)
+                    if (!empty($row[$field]))
+                        $row[$field] = date('Y-m-d, D, H:i:s', $row[$field]);
+                    else 
+                        unset($row[$field]);
+                foreach(array('uptime', 'downtime') as $field)
+                    if (!empty($row[$field]))
+                        $row[$field] = formatMSASTime($row[$field]);
+                    else
+                        unset($row[$field]);
+                $row['timezone'] = date_default_timezone_get();
+                $mb = $mb + ((strlen(json_encode($row)) / (1024 * 1024 * 1024)) * 2);
+                ini_set('memory_limit', $memory['limit'] = floor($mb) . 'M');
+                if (!isset($results[$key]))
+                    $results[$key] = $row;
+                
+            }
+            
+
+            $authkey = json_decode(file_get_contents(str_replace('%apiurl', API_ZONE_URL, API_ZONE_AUTHKEY) . "?" . http_build_query(array('username' => API_ZONE_USERNAME, 'password' => API_ZONE_PASSWORD, 'format' => 'json'))), true);
+            $domains = json_decode(file_get_contents(str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_DOMAINKEYS))), true);
+
+            if (isset($domains['domains']) && is_array($domains['domains']))
+                foreach($domains['domains'] as $domain) {
+                    if ($domain['name'] == API_ZONE_DOMAIN || $domain['master'] == API_ZONE_DOMAIN) {
+                        if (!defined("API_ZONE_DOMAINKEY"))
+                            define("API_ZONE_DOMAINKEY", $domain['domainkey']);
+                    }
+                }
+	    
+            if (defined("API_ZONE_DOMAINKEY") && $_REQUEST['mode'] == 'online') {
+                $records = json_decode(file_get_contents(str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%domainkey', API_ZONE_DOMAINKEY, API_ZONE_DNSRECORDIRECTORY_SEPARATOR)))), true);
+                foreach($results as $key => $pool) {
+                    $hostname = $pool['hostname'];
+                    $apiaction = false;
+                    if (isset($records['zones']) && is_array($records['zones']))
+                        foreach($records['zones'] as $record) {
+                            if ($record['name'] == sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $pool['typal']) && $record['type'] == API_ZONE_CNAMETYPE) {
+                                if ($record['content'] != $hostname) {
+                                    @file_get_contents(str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%recordkey', $record['recordkey'], API_ZONE_EDITRECORD))) . '?' . http_build_query(array('content'=>$hostname)));
+                                }
+                                $apiaction = true;
+                            }
+                        }
+                    if (isset($hostname) && !empty($hostname) && $apiaction!=true) {
+                        @file_get_contents(str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_ADDRECORD)) ."?" . http_build_query(array('domain' => API_ZONE_DOMAINKEY, 'type' => API_ZONE_CNAMETYPE, 'name' => sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $pool['typal']), 'content'=>$hostname, 'ttl' => 6000, 'prio' => 5, 'format' => 'json')));
+                        $apiaction = true;
+                    }
+                    if ($apiaction == true)
+                        $results[$key]['hostname'] = str_replace($hostname, sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $pool['typal']), $hostname);
+                }
+            }
+            APICache::write('state-'.$mode, $result, $sec = mt_rand(15, 60) * mt_rand(20, 445));
+            APICache::write('memory-state-'.$mode, $memory, $sec * 2);
         }
         return $results;
     }
@@ -183,37 +253,44 @@ if (!function_exists("getHostsLestatsKeys")) {
     
     function getHostsLestatsKeys($mode, $format) 
     {
-        
-        switch ($mode) {
-            case 'pings':
-                $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `hostname`, `pinging` as `pinging-in-ms` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinging` > 0 ORDER BY `pinging` ASC";
-                break;
-            case 'uptime':
-                $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `hostname`, `uptime` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` > `downtime` AND `uptime` > 0  ORDER BY `uptime` DESC";
-                break;
-            case 'downtime':
-                $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `hostname`, `downtime` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` <= `downtime` ORDER BY `downtime` DESC";
-                break;
-            case 'nextping':
-                $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `hostname`, `pinged` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinged` > UNIX_TIMESTAMP() ORDER BY `pinged` ASC";
-                break;
-        }
-        $mb = 82;
-        $results = array();
-        $result = $GLOBALS['APIDB']->queryF($sql);
-        while($row = $GLOBALS['APIDB']->fetchArray($result))
-        {
-            $key = nef($row['hostname']);
-            if (isset($row['uptime']))
-                $row['uptime'] = formatMSASTime($row['uptime'] * 1000);
-            if (isset($row['downtime']))
-                $row['downtime'] = formatMSASTime($row['downtime'] * 1000);
-            if (isset($row['pinged']))
-                $row['pinged'] = date("Y-m-d W, D, H:i:s", $row['pinged']);
-            $mb = $mb + ((strlen(json_encode($row)) / (1024 * 1024 * 1024)) * 2);
-            ini_set('memory_limit', floor($mb) . 'M');
-            if (!isset($results[$key]))
-                $results[$key] = $row;
+        if ($memory = APICache::read('memory-stats-'.$mode))
+            if (isset($memory['limit']) && !empty($memory['limit']))
+                ini_set('memory_limit', $memory['limit']);
+                
+        if (!$results = APICache::read('state-'.$mode)) {
+            switch ($mode) {
+                case 'pings':
+                    $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `hostname`, `pinging` as `pinging-in-ms` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinging` > 0 ORDER BY `pinging` ASC";
+                    break;
+                case 'uptime':
+                    $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `hostname`, `uptime` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` > `downtime` AND `uptime` > 0  ORDER BY `uptime` DESC";
+                    break;
+                case 'downtime':
+                    $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `hostname`, `downtime` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `uptime` <= `downtime` ORDER BY `downtime` DESC";
+                    break;
+                case 'nextping':
+                    $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `hostname`, `pinged` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinged` > UNIX_TIMESTAMP() ORDER BY `pinged` ASC";
+                    break;
+            }
+            $mb = 82;
+            $memory = $results = array();
+            $result = $GLOBALS['APIDB']->queryF($sql);
+            while($row = $GLOBALS['APIDB']->fetchArray($result))
+            {
+                $key = nef($row['hostname']);
+                if (isset($row['uptime']))
+                    $row['uptime'] = formatMSASTime($row['uptime'] * 1000);
+                if (isset($row['downtime']))
+                    $row['downtime'] = formatMSASTime($row['downtime'] * 1000);
+                if (isset($row['pinged']))
+                    $row['pinged'] = date("Y-m-d W, D, H:i:s", $row['pinged']);
+                $mb = $mb + ((strlen(json_encode($row)) / (1024 * 1024 * 1024)) * 2);
+                ini_set('memory_limit', $memory['limit'] = floor($mb) . 'M');
+                if (!isset($results[$key]))
+                    $results[$key] = $row;
+            }
+            APICache::write('stats-'.$mode, $result, $sec = mt_rand(15, 60) * mt_rand(20, 445));
+            APICache::write('memory-stats-'.$mode, $memory, $sec * 2);
         }
         return $results;
     }
@@ -264,71 +341,75 @@ if (!function_exists('yonkOnlyAlphanumeric'))
         return($result);
     }
 }
+
 if (!function_exists("getHostsRSS")) {
     
     function getHostsRSS($mode, $items, $format) {
-        $feed = array();
-        $feed['link'] = API_URL;
-        $feed['lastbuild'] = formatRssTimestamp(time());
-        $feed['image_url'] = API_URL . '/assets/images/logo_500x500.png';
-        $feed['image_width'] = 500;
-        $feed['image_height'] = 500;
-        switch ($mode) {
-            case 'top':
-                $feed['title'] = "Top NTP Services on: " . API_URL;
-                $feed['desc'] = "This is the top NTP Services on: " . API_URL . " ~ they can variable and variate from time to time!";
-                $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat((`uptime` / `pinging`), `id`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, `online` as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE (`uptime` / `pinging`) > 0 HAVING (`pinged` > UNIX_TIMESTAMP() AND `pinging` > 0 AND `uptime` > 0) ORDER BY (`uptime` / `pinging`) DESC LIMIT $items";
-                break;
-            case 'worse':
-                $feed['title'] = "Worse NTP Services on: " . API_URL;
-                $feed['desc'] = "This is the worst NTP Services on: " . API_URL . " ~ they can variable and variate from time to time!";
-                $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat((`downtime` * `pinging`), `id`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, `offline` as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE (`downtime` * `pinging`) > 0 HAVING (`pinged` > UNIX_TIMESTAMP() AND `pinging` > 0  AND `downtime` > 0) ORDER BY (`downtime` * `pinging`) DESC LIMIT $items";
-                break;
-            case 'new':
-                $feed['title'] = "New NTP Services on: " . API_URL;
-                $feed['desc'] = "This is the new NTP Services on: " . API_URL . " ~ they can variable and variate from time to time!";
-                $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat(`created`, `id`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, UNIX_TIMESTAMP() as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` ORDER BY `created` DESC LIMIT $items";
-                break;
-        }
-        
-        $results = array();
-        $result = $GLOBALS['APIDB']->queryF($sql);
-        while($row = $GLOBALS['APIDB']->fetchArray($result))
-        {
-            $key = nef($row['hostname']);
-            $row['title'] = $row['companyname'] . ' ~ [ ' . $row['hostname'] . ":" . $row['port'] . ' ] :: [ Ping: ' . number_format($row['pinging'], 4) . 'ms' . ' ]';
-            if (isset($row['uptime']))
-                $row['uptime'] = formatMSASTime($row['uptime']);
-            if (isset($row['downtime']))
-                $row['downtime'] = formatMSASTime($row['downtime']);
-            if (isset($row['pinging']))
-                $row['pinging'] = number_format($row['pinging'], 4) . 'ms';
-            if (isset($row['pinged']))
-                $row['pinged'] = date("Y-m-d W, D, H:i:s", $row['pinged']);
-            if (isset($row['pubDate']))
-                $row['pubDate'] = formatRssTimestamp($row['pubDate']);
-            if (!isset($results[$key]))
-                $results[$key] = $row;
-        }
-        if (count($results)) {
-            $feeditem = file_get_contents(__DIR__ . DS . 'data' . DS . 'item.xml');
-            $items = array();
-            foreach($results as $key => $result) {
-                $items[$key] = $feeditem;
-                $keys = array_keys($result);
-                sort($keys, SORT_DESC);
-                foreach($keys as $field)
-                    $items[$key] = str_replace("%$field", $result[$field], $items[$key]);
+                
+        if (!$feed = APICache::read('rss-'.$mode)) {
+            $feed = array();
+            $feed['link'] = API_URL;
+            $feed['lastbuild'] = formatRssTimestamp(time());
+            $feed['image_url'] = API_URL . '/assets/images/logo_500x500.png';
+            $feed['image_width'] = 500;
+            $feed['image_height'] = 500;
+            switch ($mode) {
+                case 'top':
+                    $feed['title'] = "Top NTP Services on: " . API_URL;
+                    $feed['desc'] = "This is the top NTP Services on: " . API_URL . " ~ they can variable and variate from time to time!";
+                    $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat((`uptime` / `pinging`), `id`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, `online` as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE (`uptime` / `pinging`) > 0 HAVING (`pinged` > UNIX_TIMESTAMP() AND `pinging` > 0 AND `uptime` > 0) ORDER BY (`uptime` / `pinging`) DESC LIMIT $items";
+                    break;
+                case 'worse':
+                    $feed['title'] = "Worse NTP Services on: " . API_URL;
+                    $feed['desc'] = "This is the worst NTP Services on: " . API_URL . " ~ they can variable and variate from time to time!";
+                    $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat((`downtime` * `pinging`), `id`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, `offline` as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE (`downtime` * `pinging`) > 0 HAVING (`pinged` > UNIX_TIMESTAMP() AND `pinging` > 0  AND `downtime` > 0) ORDER BY (`downtime` * `pinging`) DESC LIMIT $items";
+                    break;
+                case 'new':
+                    $feed['title'] = "New NTP Services on: " . API_URL;
+                    $feed['desc'] = "This is the new NTP Services on: " . API_URL . " ~ they can variable and variate from time to time!";
+                    $sql = "SELECT md5(concat(`id`,'ntpservice','".API_URL."')) as `key`, `pinging`, `pinged`, `uptime`, `downtime`, sha1(concat(`created`, `id`,'ntpservice','".API_URL."')) as `guid`, `hostname`, `port`, `name`, `nameurl`, `companyname`, `companyurl`, UNIX_TIMESTAMP() as `pubDate` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` ORDER BY `created` DESC LIMIT $items";
+                    break;
             }
-            $feed['items'] = implode("\n\n", $items);
-            $feedxml = file_get_contents(__DIR__ . DS . 'data' . DS . 'feed.xml');
-            foreach($feed as $field => $value)
-                $feedxml = str_replace("%$field", $value, $feedxml);
-            ob_end_clean();
-            header('Content-type: text/rss+xml');
-            die(trim($feedxml));
+            
+            $results = array();
+            $result = $GLOBALS['APIDB']->queryF($sql);
+            while($row = $GLOBALS['APIDB']->fetchArray($result))
+            {
+                $key = nef($row['hostname']);
+                $row['title'] = $row['companyname'] . ' ~ [ ' . $row['hostname'] . ":" . $row['port'] . ' ] :: [ Ping: ' . number_format($row['pinging'], 4) . 'ms' . ' ]';
+                if (isset($row['uptime']))
+                    $row['uptime'] = formatMSASTime($row['uptime']);
+                if (isset($row['downtime']))
+                    $row['downtime'] = formatMSASTime($row['downtime']);
+                if (isset($row['pinging']))
+                    $row['pinging'] = number_format($row['pinging'], 4) . 'ms';
+                if (isset($row['pinged']))
+                    $row['pinged'] = date("Y-m-d W, D, H:i:s", $row['pinged']);
+                if (isset($row['pubDate']))
+                    $row['pubDate'] = formatRssTimestamp($row['pubDate']);
+                if (!isset($results[$key]))
+                    $results[$key] = $row;
+            }
+            if (count($results)) {
+                $feeditem = file_get_contents(__DIR__ . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'item.xml');
+                $items = array();
+                foreach($results as $key => $result) {
+                    $items[$key] = $feeditem;
+                    $keys = array_keys($result);
+                    sort($keys, SORT_DESC);
+                    foreach($keys as $field)
+                        $items[$key] = str_replace("%$field", $result[$field], $items[$key]);
+                }
+                $feed['items'] = implode("\n\n", $items);
+                APICache::write('rss-'.$mode, $feed, $sec = mt_rand(15, 60) * mt_rand(20, 445));
+            }
         }
-        return false;
+        $feedxml = file_get_contents(__DIR__ . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'feed.xml');
+        foreach($feed as $field => $value)
+            $feedxml = str_replace("%$field", $value, $feedxml);
+        ob_end_clean();
+        header('Content-type: text/rss+xml');
+        die(trim($feedxml));
     }
 }
 
@@ -361,7 +442,7 @@ if (!function_exists("getURIData")) {
                 else
                     $uploadfile = true;
             curl_setopt($btt, CURLOPT_POST, true);
-            curl_setopt($btt, CURLOPT_POSTFIELDS, http_build_query($post));
+            curl_setopt($btt, CURLOPT_POSTFIELDIRECTORY_SEPARATOR, http_build_query($post));
             
             if (!empty($headers))
                 foreach($headers as $key => $value)
@@ -528,7 +609,7 @@ if (!function_exists("getHostnamePing")) {
                     if ($id>0)
                         $result = $result + $value /2;
                     else {
-                        $result = $avg;
+                        $result = $value;
                     }
                 return $result;
             }
@@ -670,51 +751,109 @@ if (!function_exists("getNTPConf")) {
      */
     function getNTPConf($mode = 'ntp.conf', $format = 'conf')
     {
-        $authors = $links = $pools = $servers = array();
-        $result = $GLOBALS['APIDB']->queryF($sql = "SELECT DISTINCT `name`, `nameemail`, `pinging` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
-        while($row = $GLOBALS['APIDB']->fetchArray($result))
-            if (!empty($row['name']) && !empty($row['nameemail']))
-                if (!isset($authors[$row['nameemail']]))
-                    $authors[$row['nameemail']] = sprintf("## @author          %s <%s>", $row['name'], $row['nameemail']);
-
-                    $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `companyname`, `companyemail`, `pinging` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
-        while($row = $GLOBALS['APIDB']->fetchArray($result))
-            if (!empty($row['companyname']) && !empty($row['companyemail']))
-                if (!isset($authors[$row['companyemail']]))
-                    $authors[$row['companyemail']] = sprintf("## @author          %s <%s>", $row['companyname'], $row['companyemail']);
-        $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `name`, `nameurl`, `pinging` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
-        while($row = $GLOBALS['APIDB']->fetchArray($result))
-            if (!empty($row['name']) && !empty($row['nameurl']))
-                if (!isset($links[$row['nameurl']]))
-                    $links[$row['nameurl']] = sprintf("## @link            %s %s", $row['name'], $row['nameurl']);
-        $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `companyname`, `companyurl`, `pinging` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
-        while($row = $GLOBALS['APIDB']->fetchArray($result))
-            if (!empty($row['companyname']) && !empty($row['companyurl']))
-                if (!isset($links[$row['companyurl']]))
-                    $links[$row['companyurl']] = sprintf("## @link            %s %s", $row['companyname'], $row['companyurl']);
-        $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `hostname`, `port`, `pinging` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "pool" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
-        while($row = $GLOBALS['APIDB']->fetchArray($result))
-            if (!empty($row['hostname']))
-                if (!isset($pools[$row['hostname']]) && $row['port'] == '123')
-                    $pools[$row['hostname']] = sprintf("pool %s iburst", $row['hostname']);
-                elseif (!isset($pools[$row['hostname']]) && $row['port'] != '123')
-                    $pools[$row['hostname'].":".$row['port']] = sprintf("pool %s:%s iburst", $row['hostname'], $row['port']);
-        $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `hostname`, `port`, `pinging` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "server" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
-        while($row = $GLOBALS['APIDB']->fetchArray($result))
-            if (!empty($row['hostname']))
-                if (!isset($servers[$row['hostname']]) && $row['port'] == '123')
-                    $servers[$row['hostname']] = sprintf("server %s", $row['hostname']);
-                elseif (!isset($pools[$row['hostname']]) && $row['port'] != '123')
-                    $servers[$row['hostname'].":".$row['port']] = sprintf("server %s:%s", $row['hostname'], $row['port']);
+        if (true==true&&!$nptconf = APICache::read('ntp.conf')) {
+            $authors = $links = $pools = $servers = array();
+            $result = $GLOBALS['APIDB']->queryF($sql = "SELECT DISTINCT `name`, `nameemail`, `pinging` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
+            while($row = $GLOBALS['APIDB']->fetchArray($result))
+                if (!empty($row['name']) && !empty($row['nameemail']))
+                    if (!isset($authors[$row['nameemail']]))
+                        $authors[$row['nameemail']] = sprintf("## @author          %s <%s>", $row['name'], $row['nameemail']);
     
-        if (count($authors)==0)
-            $authors['##'] = '## ';
+                        $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `companyname`, `companyemail`, `pinging` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
+            while($row = $GLOBALS['APIDB']->fetchArray($result))
+                if (!empty($row['companyname']) && !empty($row['companyemail']))
+                    if (!isset($authors[$row['companyemail']]))
+                        $authors[$row['companyemail']] = sprintf("## @author          %s <%s>", $row['companyname'], $row['companyemail']);
+            $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `name`, `nameurl`, `pinging` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
+            while($row = $GLOBALS['APIDB']->fetchArray($result))
+                if (!empty($row['name']) && !empty($row['nameurl']))
+                    if (!isset($links[$row['nameurl']]))
+                        $links[$row['nameurl']] = sprintf("## @link            %s %s", $row['name'], $row['nameurl']);
+            $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `companyname`, `companyurl`, `pinging` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
+            while($row = $GLOBALS['APIDB']->fetchArray($result))
+                if (!empty($row['companyname']) && !empty($row['companyurl']))
+                    if (!isset($links[$row['companyurl']]))
+                        $links[$row['companyurl']] = sprintf("## @link            %s %s", $row['companyname'], $row['companyurl']);
+            $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `hostname`, `port`, `pinging`, `companyname`, `companyurl` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "pool" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
+            while($row = $GLOBALS['APIDB']->fetchArray($result))
+                if (!empty($row['hostname']))
+                    if (!isset($pools[$row['hostname']]) && $row['port'] == '123')
+                        $pools[$row['hostname']] = sprintf("pool %s iburst\t\t\t## %s <%s>", $row['hostname'], $row['companyname'], $row['companyurl']);
+                    elseif (!isset($pools[$row['hostname']]) && $row['port'] != '123')
+                        $pools[$row['hostname'].":".$row['port']] = sprintf("pool %s:%s iburst\t\t\t## %s <%s>", $row['hostname'], $row['port'], $row['companyname'], $row['companyurl']);
+            $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `hostname`, `port`, `pinging`, `companyname`, `companyurl` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "server" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
+            while($row = $GLOBALS['APIDB']->fetchArray($result))
+                if (!empty($row['hostname']))
+                    if (!isset($servers[$row['hostname']]) && $row['port'] == '123')
+                        $servers[$row['hostname']] = sprintf("server %s\t\t\t## %s <%s>", $row['hostname'], $row['companyname'], $row['companyurl']);
+                    elseif (!isset($pools[$row['hostname']]) && $row['port'] != '123')
+                        $servers[$row['hostname'].":".$row['port']] = sprintf("server %s:%s\t\t\t## %s <%s>", $row['hostname'], $row['port'], $row['companyname'], $row['companyurl']);
         
-        if (count($links)==0)
-            $links['##'] = '## ';
+            if (count($authors)==0)
+                $authors['##'] = '## ';
+            
+            if (count($links)==0)
+                $links['##'] = '## ';
                 
-        header("Context-Type: text/text");
-        die(str_replace('\n\n## ', '\n## ', str_replace('%ip', $_SERVER['REMOTE_ADDR'], str_replace("%url", API_URL . $_SERVER['REQUEST_URI'], str_replace("YYYY/MM/DD HH:II:SS", date("Y-m-d W.Y, D, H:i:s"), str_replace('%servers', implode("\n", $servers), str_replace('%pools', implode("\n", $pools), str_replace('%links', implode("\n", $links), str_replace('%authors', implode("\n", $authors), file_get_contents(__DIR__ . DS . 'data' . DS . 'ntp.conf.txt'))))))))));
+            $authkey = json_decode(file_get_contents(str_replace('%apiurl', API_ZONE_URL, API_ZONE_AUTHKEY) . '?' . http_build_query(array('username' => API_ZONE_USERNAME, 'password' => API_ZONE_PASSWORD, 'format' => 'json'))), true);
+            $domains = json_decode(file_get_contents(str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_DOMAINKEYS))), true);
+             
+            if (isset($domains['domains']) && is_array($domains['domains']))
+                foreach($domains['domains'] as $domain) {
+                    if ($domain['name'] == API_ZONE_DOMAIN || $domain['master'] == API_ZONE_DOMAIN) {
+                        if (!defined("API_ZONE_DOMAINKEY"))
+                            define("API_ZONE_DOMAINKEY", $domain['domainkey']);
+                    }
+                }
+            
+            if (defined("API_ZONE_DOMAINKEY")) {
+                $records = json_decode(file_get_contents(str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%domainkey', API_ZONE_DOMAINKEY, API_ZONE_DNSRECORDIRECTORY_SEPARATOR)))), true);
+                foreach($pools as $key => $pool) {
+                    $parts = explode(":", $key);
+                    $hostname = $parts[0];
+                    $apiaction = false;
+                    if (isset($records['zones']) && is_array($records['zones']))
+                        foreach($records['zones'] as $record) {
+                            if ($record['name'] == sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), 'pool') && $record['type'] == API_ZONE_CNAMETYPE) {
+                                if ($record['content'] != $hostname) {
+                                    @file_get_contents(str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%recordkey', $record['recordkey'], API_ZONE_EDITRECORD))) . '?' . http_build_query(array('content'=>$hostname)));
+                                }
+                                $apiaction = true;
+                            }
+                        }
+                    if (isset($hostname) && !empty($hostname) && $apiaction!=true) {
+                        @file_get_contents(str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_ADDRECORD)) .'?'. http_build_query(array('domain' => API_ZONE_DOMAINKEY, 'type' => API_ZONE_CNAMETYPE, 'name' => sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), 'pool'), 'content'=>$hostname, 'ttl' => 6000, 'prio' => 5, 'format' => 'json')));
+                        $apiaction = true;
+                    }
+                    if ($apiaction == true)
+                        $pools[$key] = str_replace($hostname, sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), 'pool'), $pool);
+                }
+                foreach($servers as $key => $server) {
+                    $parts = explode(":", $key);
+                    $hostname = $parts[0];
+                    $apiaction = false;
+                    if (isset($records['zones']) && is_array($records['zones']))
+                        foreach($records['zones'] as $record) {
+                            if ($record['name'] == sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), 'server') && $record['type'] == API_ZONE_CNAMETYPE) {
+                                if ($record['content'] != $hostname) {
+                                    @file_get_contents(str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%recordkey', $record['recordkey'], API_ZONE_EDITRECORD))) . '?' . http_build_query(array('content'=>$hostname)));
+                                }
+                                $apiaction = true;
+                            }
+                        }
+                    if (isset($hostname) && !empty($hostname) && $apiaction!=true) {
+                        @file_get_contents(str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_ADDRECORD)) .'?'. http_build_query(array('domain' => API_ZONE_DOMAINKEY, 'type' => API_ZONE_CNAMETYPE, 'name' => sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), 'server'), 'content'=>$hostname, 'ttl' => 6000, 'prio' => 5, 'format' => 'json')));
+                        $apiaction = true;
+                    }
+                    if ($apiaction == true)
+                        $servers[$key] = str_replace($hostname, sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), 'server'), $server);
+                }
+            }
+            $ntpconf = explode("\n", str_replace('\n\n## ', '\n## ', str_replace('%ip', $_SERVER['REMOTE_ADDR'], str_replace("%url", API_URL . $_SERVER['REQUEST_URI'], str_replace("YYYY/MM/DD HH:II:SS", date("Y-m-d W.Y, D, H:i:s"), str_replace('%servers', implode("\n", $servers), str_replace('%pools', implode("\n", $pools), str_replace('%links', implode("\n", $links), str_replace('%authors', implode("\n", $authors), file_get_contents(__DIR__ . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'ntp.conf.txt'))))))))));
+            APICache::write('ntp.conf', $ntpconf, mt_rand(15, 60) * mt_rand(20, 445));
+        }
+        header("Context-Type: text");
+        die(implode("\n", $ntpconf));
     
     }
 }
@@ -1028,7 +1167,7 @@ function getHTMLForm($mode = '', $var = '')
             $form[] = "\t\t</tr>";
             $form[] = "\t\t<tr>";
             $form[] = "\t\t\t<td style='width: 499px;'>";
-            $form[] = "\t\t\t\t<label for='name'>Person's Name:&nbsp;<font style='color: rgb(250,0,0); font-size: 139%; font-weight: bold'>*</font></label>";
+            $form[] = "\t\t\t\t<label for='name'>Telephanist's Name:&nbsp;<font style='color: rgb(250,0,0); font-size: 139%; font-weight: bold'>*</font></label>";
             $form[] = "\t\t\t</td>";
             $form[] = "\t\t\t<td>";
             $form[] = "\t\t\t\t<input type='textbox' name='name' id='name' maxlen='128' size='28'  value='".$var['name']."'/><br/>";
@@ -1037,7 +1176,7 @@ function getHTMLForm($mode = '', $var = '')
             $form[] = "\t\t</tr>";
             $form[] = "\t\t<tr>";
             $form[] = "\t\t\t<td style='width: 499px;'>";
-            $form[] = "\t\t\t\t<label for='nameurl'>Person's URL:</label>";
+            $form[] = "\t\t\t\t<label for='nameurl'>Telephanist's URL:</label>";
             $form[] = "\t\t\t</td>";
             $form[] = "\t\t\t<td>";
             $form[] = "\t\t\t\t<input type='textbox' name='nameurl' id='nameurl' maxlen='250'  size='28' value='".$var['nameurl']."'/><br/>";
@@ -1046,7 +1185,7 @@ function getHTMLForm($mode = '', $var = '')
             $form[] = "\t\t</tr>";
             $form[] = "\t\t<tr>";
             $form[] = "\t\t\t<td style='width: 499px;'>";
-            $form[] = "\t\t\t\t<label for='nameemail'>Person's eMail:&nbsp;<font style='color: rgb(250,0,0); font-size: 139%; font-weight: bold'>*</font></label>";
+            $form[] = "\t\t\t\t<label for='nameemail'>Telephanist's eMail:&nbsp;<font style='color: rgb(250,0,0); font-size: 139%; font-weight: bold'>*</font></label>";
             $form[] = "\t\t\t</td>";
             $form[] = "\t\t\t<td>";
             $form[] = "\t\t\t\t<input type='textbox' name='nameemail' id='nameemail' maxlen='196'  size='28'  value='".$var['nameemail']."'/><br/>";
