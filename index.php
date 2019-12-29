@@ -91,7 +91,7 @@
 	            $data = editNTP($inner['key'], $inner['hostname'], $inner['port'], $inner['name'], $inner['nameemail'], $inner['nameurl'], $inner['companyname'], $inner['companyemail'], $inner['companyrbn'], $inner['companyrbntype'], $inner['companytype'], $inner['companyurl'], $inner['format']);
 	            break;
 	    case 'ntp.conf':
-	        $data = getNTPConf($inner['mode'], $inner['format']);
+	        $data = getNTPConf($inner['mode'], $inner['format'], $inner['pool'], $inner['pools']);
 	        break;
 	    case 'top':
 	    case 'new':
@@ -102,9 +102,13 @@
 	                $items = $key;
             $data = getHostsRSS($inner['mode'], $items, $inner['format']);
 	        break;
+	    case 'offcompanies':
+	    case 'companies':
+	        $data = getCompaniesKeys($inner['mode'], $inner['format']);
+	        break;
 	    case 'online':
 	    case 'offline':
-	        $data = getHostsKeys($inner['mode'], $inner['format']);
+	        $data = getHostsKeys($inner['mode'], $inner['format'], $inner['pool'], $inner['pools']);
 	        break;
 	    case 'pings':
 	    case 'uptime':

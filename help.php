@@ -91,7 +91,10 @@
 	<img style="float: right; margin: 11px; width: auto; height: auto; clear: none;" src="<?php echo API_URL; ?>/assets/images/logo_350x350.png" />
     <h1><?php echo API_URL; ?> -- <?php echo API_LICENSE_COMPANY; ?></h1>
     <p>As an API, this allows you to anonymously without authentication add either IPv4, IPv6 or Network Netbios Hostnames for NTP Time based services on the internet and the wider worlds of networking.</p>
-	<h2>Code API Documentation</h2>
+    <p>You can get the NTP Protocol this is a time exchange based protocol which computers and the internet use to lookup and calibrate your own system clocks; so to use this you would from the following URL on your Windows or Macintosh Control Panel + System Settings in the time options; it also work in your internet router at home or in the office; put the following host pathname:<p>
+    <p style="text-align: center; font-size: 245%"><em><strong><?php echo parse_url(API_URL, PHP_URL_HOST); ?></strong></em></p>
+    <p style="font-size: 145%">For any on going details of this timing-bell please referee to our online documentation here: <a href="https://sourceforge.net/p/chronolabs-cooperative/wiki/NTP%20Servers%20Pooling/" target="_blank">https://sourceforge.net/p/chronolabs-cooperative/wiki/NTP Servers Pooling/</a>...</p>
+    <h2>Code API Documentation</h2>
     <p>You can find the phpDocumentor code API documentation at the following path :: <a href="<?php echo API_URL . '/'; ?>docs/" target="_blank"><?php echo API_URL . '/'; ?>docs/</a>. These should outline the source code core functions and classes for the API to function!</p>
     <h2>ADDNTP Document Output</h2>
     <p>This is done with the <em>add.api</em> extension at the end of the url, you replace the example address with either a domain!</p>
@@ -105,8 +108,10 @@
     <h2>NTP.CONF Document Output</h2>
     <p>This is done with the <em>ntp.conf</em> extension at the end of the url, you replace the example address with either a domain!</p>
     <blockquote>
-        <font class="help-title-text">This provides a /etc/ntp.conf for debian/ubuntu at least that you can replace your existing one with</font><br/>
-        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/ntp.conf" target="_blank"><?php echo API_URL . '/'; ?>v1/ntp.conf</a></font><br /><br />
+        <font class="help-title-text">This provides a complete /etc/ntp.conf for debian/ubuntu at least that you can replace your existing one with</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/ntp.conf" target="_blank"><?php echo API_URL . '/'; ?>v1/ntp.conf</a></font><br />
+        <font class="help-title-text">Pooled results of 8 pools and return pool number <?php echo $pool = mt_rand(1, 8); ?> of /etc/ntp.conf for debian/ubuntu at least that you can replace your existing one with</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/<?php echo $pool ; ?>/8/ntp.conf" target="_blank"><?php echo API_URL . '/'; ?>v1/<?php echo $pool ; ?>/8/ntp.conf</a></font><br /><br />
     </blockquote>
     <h3>This the SH Cron batch script you should run on adverage every four hours and fifteen minutes!</h3>
     <pre style="max-height: 300px; overflow: scroll;">
@@ -125,6 +130,7 @@ then
    rm -vf /etc/ntp.conf 
    mv /tmp/ntp.conf /etc
    chmod -fv 0644 /etc/ntp.conf
+   service ntp reload
 else
    echo " ntp.conf was returned empty or not existing! "
 fi
@@ -155,8 +161,12 @@ fi
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/downtime.php" target="_blank"><?php echo API_URL . '/'; ?>v1/downtime.php</a></font><br /><br />
         <font class="help-title-text">This provides a list and keys of defined in the offline.php/online.php api call as well as the next time the key is due to be pinged by timeout (least to greatest)</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/nextping.php" target="_blank"><?php echo API_URL . '/'; ?>v1/nextping.php</a></font><br /><br />
+        <font class="help-title-text">This provides a list of the companies which are currently online from closest ping to least!</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/companies.php" target="_blank"><?php echo API_URL . '/'; ?>v1/companies.php</a></font><br /><br />
+        <font class="help-title-text">This provides a list of the companies which are currently offline currently!</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/offcompanies.php" target="_blank"><?php echo API_URL . '/'; ?>v1/offcompanies.php</a></font><br /><br />
     </blockquote>
-    <h2>ASP Document Output</h2>
+    <!--<h2>ASP Document Output</h2>
     <p>This is done with the <em>command.asp</em> extension at the end of the url.</p>
     <blockquote>
         <font class="help-title-text">This provides a list and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
@@ -171,7 +181,7 @@ fi
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/downtime.asp" target="_blank"><?php echo API_URL . '/'; ?>v1/downtime.asp</a></font><br /><br />
         <font class="help-title-text">This provides a list and keys of defined in the offline.asp/online.asp api call as well as the next time the key is due to be pinged by timeout (least to greatest)</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/nextping.asp" target="_blank"><?php echo API_URL . '/'; ?>v1/nextping.asp</a></font><br /><br />
-    </blockquote>
+    </blockquote>-->
     <h2>Serialisation Document Output</h2>
     <p>This is done with the <em>command.serial</em> extension at the end of the url.</p>
     <blockquote>
@@ -187,6 +197,10 @@ fi
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/downtime.serial" target="_blank"><?php echo API_URL . '/'; ?>v1/downtime.serial</a></font><br /><br />
         <font class="help-title-text">This provides a list and keys of defined in the offline.serial/online.serial api call as well as the next time the key is due to be pinged by timeout (least to greatest)</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/nextping.serial" target="_blank"><?php echo API_URL . '/'; ?>v1/nextping.serial</a></font><br /><br />
+        <font class="help-title-text">This provides a list of the companies which are currently online from closest ping to least!</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/companies.serial" target="_blank"><?php echo API_URL . '/'; ?>v1/companies.serial</a></font><br /><br />
+        <font class="help-title-text">This provides a list of the companies which are currently offline currently!</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/offcompanies.serial" target="_blank"><?php echo API_URL . '/'; ?>v1/offcompanies.xml</a></font><br /><br />
     </blockquote>
     <h2>JSON Document Output</h2>
     <p>This is done with the <em>command.json</em> extension at the end of the url, you replace the address with either a domain, an IPv4 or IPv6 address the following example is of calls to the api</p>
@@ -203,6 +217,10 @@ fi
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/downtime.json" target="_blank"><?php echo API_URL . '/'; ?>v1/downtime.json</a></font><br /><br />
         <font class="help-title-text">This provides a list and keys of defined in the offline.json/online.json api call as well as the next time the key is due to be pinged by timeout (least to greatest)</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/nextping.json" target="_blank"><?php echo API_URL . '/'; ?>v1/nextping.json</a></font><br /><br />
+        <font class="help-title-text">This provides a list of the companies which are currently online from closest ping to least!</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/companies.json" target="_blank"><?php echo API_URL . '/'; ?>v1/companies.json</a></font><br /><br />
+        <font class="help-title-text">This provides a list of the companies which are currently offline currently!</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/offcompanies.json" target="_blank"><?php echo API_URL . '/'; ?>v1/offcompanies.xml</a></font><br /><br />
 	</blockquote>
     <h2>XML Document Output</h2>
     <p>This is done with the <em>command.xml</em> extension at the end of the url, you replace the address with either a domain, an IPv4 or IPv6 address the following example is of calls to the api</p>
@@ -219,6 +237,10 @@ fi
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/downtime.xml" target="_blank"><?php echo API_URL . '/'; ?>v1/downtime.xml</a></font><br /><br />
         <font class="help-title-text">This provides a list and keys of defined in the offline.xml/online.xml api call as well as the next time the key is due to be pinged by timeout (least to greatest)</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/nextping.xml" target="_blank"><?php echo API_URL . '/'; ?>v1/nextping.xml</a></font><br /><br />
+        <font class="help-title-text">This provides a list of the companies which are currently online from closest ping to least!</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/companies.xml" target="_blank"><?php echo API_URL . '/'; ?>v1/companies.xml</a></font><br /><br />
+        <font class="help-title-text">This provides a list of the companies which are currently offline currently!</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/offcompanies.xml" target="_blank"><?php echo API_URL . '/'; ?>v1/offcompanies.xml</a></font><br /><br />    
     </blockquote>
     <h2>The Author</h2>
     <p>This was developed by Dr. Simon Antony Roberts in 2019 and is part of the Chronolabs System and api's.<br/><br/>This is open source which you can download from <a href="https://sourceforge.net/p/chronolabs-cooperative/ntp-pooling-api-php/ci/master/tree/">https://sourceforge.net/p/chronolabs-cooperative/ntp-pooling-api-php/ci/master/tree/</a> contact the scribe  <a href="mailto:wishcraft@users.sourceforge.net">wishcraft@users.sourceforge.net</a></p></body>
