@@ -165,20 +165,20 @@ function checkEmail($email, $antispam = false)
 
 if (!function_exists("getHostsKeys")) {
     
-    function getHostsKeys($mode, $format, $pool = 0, $pools = 0)
+    function getHostsKeys($mode, $format, $pooler = 0, $poolers = 0)
     {
-        if ($memory = APICache::read('memory-state-'.$mode))
+        if ($memory = APICache::read('memory-state-'.$mode.'-'.$pooler.'.'.$poolers))
             if (isset($memory['limit']) && !empty($memory['limit']))
                 ini_set('memory_limit', $memory['limit']);
                 
-        if (!$results = APICache::read('state-'.$mode)) {
+        if (!$results = APICache::read('state-'.$mode.'-'.$pooler.'.'.$poolers)) {
             switch ($mode) {
                 case 'online':
-                    if ($pool <= $pools && $pool > 0) {
+                    if ($pooler <= $poolers && $pooler > 0) {
                         $countsql = "SELECT count(*) FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinging` > 0 AND `uptime` > `downtime` AND `uptime` > 0 ORDER BY `pinging` DESC";
                         list($count) = $GLOBALS['APIDB']->fetchRow($GLOBALS['APIDB']->queryF($countsql));
-                        $limit = $count / $pools;
-                        $sql = "SELECT *, md5(concat(`id`,'ntpservice','".API_URL."')) as `key` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinging` > 0 AND `uptime` > `downtime` AND `uptime` > 0 ORDER BY `pinging` DESC LIMIT " . ($limit * ($pool - 1)) . ', ' . $limit;
+                        $limit = $count / $poolers;
+                        $sql = "SELECT *, md5(concat(`id`,'ntpservice','".API_URL."')) as `key` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinging` > 0 AND `uptime` > `downtime` AND `uptime` > 0 ORDER BY `pinging` DESC LIMIT " . ($limit * ($pooler - 1) + 1) . ', ' . $limit;
                     } else 
                         $sql = "SELECT *, md5(concat(`id`,'ntpservice','".API_URL."')) as `key` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinging` > 0 AND `uptime` > `downtime` AND `uptime` > 0 ORDER BY `pinging` DESC";
                     break;
@@ -286,8 +286,8 @@ if (!function_exists("getHostsKeys")) {
                     $results[$key]['typal'] = $pooling[$hostname]['typal'];
                 }
             }
-            APICache::write('state-'.$mode, $results, $sec = mt_rand(15, 60) * mt_rand(20, 445));
-            APICache::write('memory-state-'.$mode, $memory, $sec * 2);
+            APICache::write('state-'.$mode.'-'.$pooler.'.'.$poolers, $results, $sec = mt_rand(15, 60) * mt_rand(20, 445));
+            APICache::write('memory-state-'.$mode.'-'.$pooler.'.'.$poolers, $memory, $sec * 2);
         }
         return $results;
     }
@@ -824,20 +824,12 @@ if (!function_exists("getNTPConf")) {
      *
      * @return 		string()
      */
-    function getNTPConf($mode = 'ntp.conf', $format = 'conf', $pool = 0, $pools = 0)
+    function getNTPConf($mode = 'ntp.conf', $format = 'conf', $pooler = 0, $poolers = 0)
     {
-        //if (!$ntpconf = APICache::read('ntp.conf~'.md5(API_ZONE_DOMAIN) . "$pool-$pools")) {
-            
-            $hostnames = $authors = $links = $pools = $servers = array();
-            if ($pool <= $pools && $pool > 0) {
-                list($count) = $GLOBALS['APIDB']->fetchRow($GLOBALS['APIDB']->queryF("SELECT count(*) FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "pool" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC'));
-                $limit = $count / $pools;
-                $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `typal`, `hostname`, `port`, `pinging`, `companyname`, `companyurl` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "pool" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC LIMIT ' . ($limit * ($pool-1)) . ','.$limit);
-            } else 
-                $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `typal`, `hostname`, `port`, `pinging`, `companyname`, `companyurl` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "pool" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
+        if (!$ntpconf = APICache::read('ntp.conf~'.md5(API_ZONE_DOMAIN) . "pool.$pooler.of.$poolers")) {
             
             $authkey = json_decode(getURIData(str_replace('%apiurl', API_ZONE_URL, API_ZONE_AUTHKEY) . '?' . http_build_query(array('username' => API_ZONE_USERNAME, 'password' => API_ZONE_PASSWORD, 'format' => 'json')), 7, 11, array()), true);
-            $domains = json_decode(getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_DOMAINKEYS))), 7, 11, array()), true);                
+            $domains = json_decode(getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_DOMAINKEYS))), 7, 11, array()), true);
             if (isset($domains['domains']) && is_array($domains['domains']))
                 foreach($domains['domains'] as $domain) {
                     if ($domain['name'] == API_ZONE_DOMAIN || $domain['master'] == API_ZONE_DOMAIN) {
@@ -847,6 +839,15 @@ if (!function_exists("getNTPConf")) {
                 }
             $records = json_decode(getURIData(str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%domainkey', API_ZONE_DOMAINKEY, API_ZONE_DNSRECORDIRECTORY_SEPARATOR))), 7, 11, array()), true);
             
+            $hostnames = $authors = $links = $pools = $servers = array();
+            if ($pooler <= $poolers && $pooler > 0) {
+                list($count) = $GLOBALS['APIDB']->fetchRow($GLOBALS['APIDB']->queryF("SELECT count(*) FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "pool" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC'));
+                $limit = floor($count / $poolers);
+                $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `typal`, `hostname`, `port`, `pinging`, `companyname`, `companyurl` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "pool" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC LIMIT ' . ($limit * ($pooler-1)) . ','.$limit);
+            } else {         
+                $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `typal`, `hostname`, `port`, `pinging`, `companyname`, `companyurl` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "pool" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY RAND() ASC LIMIT ' . mt_rand(666, 888));
+            }
+     
             while($row = $GLOBALS['APIDB']->fetchArray($result)) {
                 if (!empty($row['hostname'])) {
                     $hostname = $row['hostname'];
@@ -901,12 +902,12 @@ if (!function_exists("getNTPConf")) {
                         APICache::write(API_ZONE_DOMAINKEY.$mode.'-pooling', $pooling, time());
                     }
                     if (!isset($pools[$row['hostname']]) && $row['port'] == '123')
-                        $pools[$row['hostname']] = sprintf("pool %s iburst\t\t\t## %s <%s>", $subdomains . sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']), $row['companyname'], $row['hostname'].":".$row['port']);
+                        $pools[$row['hostname']] = sprintf("pool %s iburst\t\t\t## %s <%s>", $pooling[$hostname]['alias'], $row['companyname'], $row['hostname'].":".$row['port']);
                     elseif (!isset($pools[$row['hostname']]) && $row['port'] != '123')
-                    $pools[$row['hostname'].":".$row['port']] = sprintf("pool %s:%s iburst\t\t\t## %s <%s>", $subdomains . sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']), $row['port'], $row['companyname'], $row['hostname'].":".$row['port']);
+                        $pools[$row['hostname'].":".$row['port']] = sprintf("pool %s:%s iburst\t\t\t## %s <%s>", $pooling[$hostname]['alias'], $row['port'], $row['companyname'], $row['hostname'].":".$row['port']);
                 }
             }
-            //die(__LINE__.'::'.__FUNCTION__);
+
             if (count($pooling) > 0)
                 APICache::write(API_ZONE_DOMAINKEY.$mode.'-pooling', $pooling, time());
         
@@ -1012,11 +1013,11 @@ if (!function_exists("getNTPConf")) {
             if (count($links)==0)
                 $links['##'] = '## ';
             $ntpconf = explode("\n", str_replace('\n\n## ', '\n## ', str_replace('%ip', $_SERVER['REMOTE_ADDR'], str_replace("%url", API_URL . $_SERVER['REQUEST_URI'], str_replace("YYYY/MM/DD HH:II:SS", date("Y-m-d W.Y, D, H:i:s"), str_replace('%servers', implode("\n", $servers), str_replace('%pools', implode("\n", $pools), str_replace('%links', implode("\n", $links), str_replace('%authors', implode("\n", $authors), file_get_contents(__DIR__ . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'ntp.conf.txt'))))))))));
-            APICache::write('ntp.conf~'.md5(API_ZONE_DOMAIN) . "$pool-$pools", $ntpconf, mt_rand(141, 399) * mt_rand(1353, 2899));
+            APICache::write('ntp.conf~'.md5(API_ZONE_DOMAIN) . "pool.$pooler.of.$poolers", $ntpconf, mt_rand(141, 399) * mt_rand(1353, 2899));
             if (count($pooling)>0)
                 APICache::write(API_ZONE_DOMAINKEY.$mode.'-pooling', $pooling, time());
          
-        //}
+        }
         header("Context-Type: text");
         die(implode("\n", $ntpconf));
     

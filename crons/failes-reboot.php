@@ -56,5 +56,5 @@ if ($staters = APICache::read('failed-reboot'))
 }
 
 $html = getURIData('http://ntp.snails.email');
-if (strpos($html, 'Unable to connect to database'))
+if (strpos($html, 'Unable to connect to database') || strpos($html, '(databasefactory.php:76)'))
     shell_exec('reboot');

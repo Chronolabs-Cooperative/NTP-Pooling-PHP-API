@@ -54,16 +54,14 @@ if ($staters = APICache::read('ping-ntp-services'))
     $seconds = 1800;
 }
 
-mt_srand(time(), MT_RAND_MT19937);
-mt_srand(mt_rand(-time(), time()), MT_RAND_MT19937);
-mt_srand(mt_rand(-time() * time(), time() * time()), MT_RAND_MT19937);
-mt_srand(mt_rand(-time() * time() * time(), time() * time() * time()), MT_RAND_MT19937);
+mt_srand(microtime(true) * time() * time() * time() * time()); 
+//mt_srand(mt_rand(-microtime(true) * time() * time() * time(), microtime(true) * time() * time() * time()), MT_RAND_MT19937);
 
 $sql = array();
-if (mt_rand(1, 69) <= 58)
-    $question = "SELECT * FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinged` <= UNIX_TIMESTAMP() ORDER BY `pinged` ASC, RAND() asc";
+if (mt_rand(0, 3) >= 2)
+    $question = "SELECT * FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinged` <= UNIX_TIMESTAMP() ORDER BY `pinged` ASC, RAND() asc  LIMIT " . mt_rand(7, 29) . "";
 else {
-    $question = "SELECT * FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinged` <= UNIX_TIMESTAMP() ORDER BY `pinged` DESC, RAND() asc LIMIT " . mt_rand(41, 369); 
+    $question = "SELECT * FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinged` <= UNIX_TIMESTAMP() ORDER BY `pinged` DESC, RAND() asc LIMIT " . mt_rand(7, 29) . ""; 
 }
 $sql[] = "START TRANSACTION";
 echo "SQL Clausing: $question;\n\n";
@@ -118,10 +116,6 @@ while($ntpservice = $GLOBALS['APIDB']->fetchArray($result)) {
 }
 if (count($sql)!=false) {
 	$sql[] = "COMMIT";
-    if (file_exists(__DIR__ . DS . 'querys.sql'))
-        $querys = file_get_contents(__DIR__ . DS . 'querys.sql');
-    else 
-        $querys = "## Queries to process on mysql: " . date("Y-m-d D, W, H:i:s") . "\n##\n## Cron job:-\n##\n## */1 * * * * mysql < \"" . __DIR__ . DS . "querys.sql\" && unlink \"" . __DIR__ . DS . "querys.sql\"\n##\n##\n\nuse `" . API_DB_NAME . "`;\n\n";
-    $querys .= implode(";\n", $sql) . ";\n";
-    file_put_contents(__DIR__ . DS . 'querys.sql', $querys);
+	foreach($sql as $question)
+		@$GLOBALS['APIDB']->queryF($question);
 }

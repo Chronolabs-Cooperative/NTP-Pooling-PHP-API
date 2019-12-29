@@ -24,7 +24,8 @@
  * @link            https://twitter.com/ChronolabsCoop
  * 
  */
-
+mt_srand((integer)microtime(true) * time() * time() * time());
+sleep(mt_rand(0,59));
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'apiconfig.php';
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'class'. DIRECTORY_SEPARATOR . 'cache'. DIRECTORY_SEPARATOR . 'apicache.php';
 

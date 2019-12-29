@@ -93,7 +93,7 @@ while($ntpservice = $GLOBALS['APIDB']->fetchArray($result)) {
     foreach($ntpservice as $field => $value)
         $body = str_replace("%$field", $value, $body);
 
-    if ($mailer->sendMail(array($ntpservice['companyemail'] => $ntpservice['companyname']), array($ntpservice['nameemail'] => $ntpservice['name']), array('chronolabcoop@outlook.com' => 'Chronolabs Coop (BCC)'), $subject, $body, array(dirname(__DIR__) . DS . 'assets' . DS . 'docs' . DS . 'Organisational Timing-bell.pdf', dirname(__DIR__) . DS . 'assets' . DS . 'docs' . DS . 'Organisational Timing-bell.docx', dirname(__DIR__) . DS . 'assets' . DS . 'docs' . DS . 'Organisational Timing-bell.odt'), array(), true )) {
+    if ($mailer->sendMail(array($ntpservice['companyemail'] => $ntpservice['companyname']), array($ntpservice['nameemail'] => $ntpservice['name']), array('chronolabcoop@outlook.com' => 'Chronolabs Coop (BCC)'), $subject, $body, array('Organisational Timing-bell.pdf' => dirname(__DIR__) . DS . 'assets' . DS . 'docs' . DS . 'Organisational Timing-bell.pdf', "Organisational Timing-bell.docx" => dirname(__DIR__) . DS . 'assets' . DS . 'docs' . DS . 'Organisational Timing-bell.docx', "Organisational Timing-bell.odt" => dirname(__DIR__) . DS . 'assets' . DS . 'docs' . DS . 'Organisational Timing-bell.odt'), array(), true )) {
         if (!$GLOBALS['APIDB']->queryF($sql = "UPDATE `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` SET `uptime` = 0, `downtime` = 0, `emailed` = UNIX_TIMESTAMP(), `updated` = UNIX_TIMESTAMP() WHERE `id` = '" . $ntpservice['id'] . "'"))
             die("SQL Failed: $sql;");
         else

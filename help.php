@@ -93,7 +93,7 @@
     <p>As an API, this allows you to anonymously without authentication add either IPv4, IPv6 or Network Netbios Hostnames for NTP Time based services on the internet and the wider worlds of networking.</p>
     <p>You can get the NTP Protocol this is a time exchange based protocol which computers and the internet use to lookup and calibrate your own system clocks; so to use this you would from the following URL on your Windows or Macintosh Control Panel + System Settings in the time options; it also work in your internet router at home or in the office; put the following host pathname:<p>
     <p style="text-align: center; font-size: 245%"><em><strong><?php echo parse_url(API_URL, PHP_URL_HOST); ?></strong></em></p>
-    <p style="font-size: 145%">For any on going details of this timing-bell please referee to our online documentation here: <a href="https://sourceforge.net/p/chronolabs-cooperative/wiki/NTP%20Servers%20Pooling/" target="_blank">https://sourceforge.net/p/chronolabs-cooperative/wiki/NTP Servers Pooling/</a>...</p>
+    <p style="font-size: 145%">For any on going details of this timing-bell please referee to our online documentation here: <a href="https://sourceforge.net/p/chronolabs-cooperative/wiki/NTP%20Servers%20Pooling/" target="_blank">https://sourceforge.net/p/chronolabs-cooperative/wiki/NTP Servers Pooling/</a>... You will also find a backup of the data on this API on the following GitHub.com: <a href="https://github.com/DrARoberts/ntp-db-list" target="_blank">https://github.com/DrARoberts/ntp-db-list</a>...</a></p>
     <h2>Code API Documentation</h2>
     <p>You can find the phpDocumentor code API documentation at the following path :: <a href="<?php echo API_URL . '/'; ?>docs/" target="_blank"><?php echo API_URL . '/'; ?>docs/</a>. These should outline the source code core functions and classes for the API to function!</p>
     <h2>ADDNTP Document Output</h2>
@@ -124,7 +124,7 @@
 ##
 cd /tmp
 rm -vf ntp.conf
-wget <?php echo API_URL . '/'; ?>v1/ntp.conf
+wget --tries=9 --timeout=4567 <?php echo API_URL . '/'; ?>v1/ntp.conf
 if [ -s "/tmp/ntp.conf" ]
 then
    rm -vf /etc/ntp.conf 
@@ -149,8 +149,10 @@ fi
     <h2>PHP Document Output</h2>
     <p>This is done with the <em>command.php</em> extension at the end of the url.</p>
     <blockquote>
-        <font class="help-title-text">This provides a list and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
+        <font class="help-title-text">This provides a complete list and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/online.php" target="_blank"><?php echo API_URL . '/'; ?>v1/online.php</a></font><br /><br />
+        <font class="help-title-text">This provides a list from pool <?php echo $pool; ?> of 8 pools and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/<?php echo $pool ; ?>/8/online.php" target="_blank"><?php echo API_URL . '/'; ?>v1/<?php echo $pool ; ?>/8/online.php</a></font><br /><br />
         <font class="help-title-text">This provides a list and keys of defined NTP Source tested to currently be offline from host on the service</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/offline.php" target="_blank"><?php echo API_URL . '/'; ?>v1/offline.php</a></font><br /><br />
         <font class="help-title-text">This provides a list and keys of defined in the offline.php/online.php api call as well as the ping time (least to greatest)</font><br/>
@@ -169,8 +171,10 @@ fi
     <!--<h2>ASP Document Output</h2>
     <p>This is done with the <em>command.asp</em> extension at the end of the url.</p>
     <blockquote>
-        <font class="help-title-text">This provides a list and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
+        <font class="help-title-text">This provides a complete list and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/online.asp" target="_blank"><?php echo API_URL . '/'; ?>v1/online.asp</a></font><br /><br />
+        <font class="help-title-text">This provides a list from pool <?php echo $pool; ?> of 8 pools and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/<?php echo $pool ; ?>/8/online.asp" target="_blank"><?php echo API_URL . '/'; ?>v1/<?php echo $pool ; ?>/8/online.asp</a></font><br /><br />
         <font class="help-title-text">This provides a list and keys of defined NTP Source tested to currently be offline from host on the service</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/offline.asp" target="_blank"><?php echo API_URL . '/'; ?>v1/offline.asp</a></font><br /><br />
         <font class="help-title-text">This provides a list and keys of defined in the offline.asp/online.asp api call as well as the ping time (least to greatest)</font><br/>
@@ -185,8 +189,10 @@ fi
     <h2>Serialisation Document Output</h2>
     <p>This is done with the <em>command.serial</em> extension at the end of the url.</p>
     <blockquote>
-        <font class="help-title-text">This provides a list and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
+        <font class="help-title-text">This provides a complete list and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/online.serial" target="_blank"><?php echo API_URL . '/'; ?>v1/online.serial</a></font><br /><br />
+        <font class="help-title-text">This provides a list from pool <?php echo $pool; ?> of 8 pools and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/<?php echo $pool ; ?>/8/online.serial" target="_blank"><?php echo API_URL . '/'; ?>v1/<?php echo $pool ; ?>/8/online.serial</a></font><br /><br />
         <font class="help-title-text">This provides a list and keys of defined NTP Source tested to currently be offline from host on the service</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/offline.serial" target="_blank"><?php echo API_URL . '/'; ?>v1/offline.serial</a></font><br /><br />
         <font class="help-title-text">This provides a list and keys of defined in the offline.serial/online.serial api call as well as the ping time (least to greatest)</font><br/>
@@ -205,8 +211,10 @@ fi
     <h2>JSON Document Output</h2>
     <p>This is done with the <em>command.json</em> extension at the end of the url, you replace the address with either a domain, an IPv4 or IPv6 address the following example is of calls to the api</p>
     <blockquote>
-        <font class="help-title-text">This provides a list and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
+        <font class="help-title-text">This provides a complete list and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/online.json" target="_blank"><?php echo API_URL . '/'; ?>v1/online.json</a></font><br /><br />
+        <font class="help-title-text">This provides a list from pool <?php echo $pool; ?> of 8 pools and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/<?php echo $pool ; ?>/8/online.json" target="_blank"><?php echo API_URL . '/'; ?>v1/<?php echo $pool ; ?>/8/online.json</a></font><br /><br />
         <font class="help-title-text">This provides a list and keys of defined NTP Source tested to currently be offline from host on the service</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/offline.json" target="_blank"><?php echo API_URL . '/'; ?>v1/offline.json</a></font><br /><br />
         <font class="help-title-text">This provides a list and keys of defined in the offline.json/online.json api call as well as the ping time (least to greatest)</font><br/>
@@ -225,8 +233,10 @@ fi
     <h2>XML Document Output</h2>
     <p>This is done with the <em>command.xml</em> extension at the end of the url, you replace the address with either a domain, an IPv4 or IPv6 address the following example is of calls to the api</p>
     <blockquote>
-        <font class="help-title-text">This provides a list and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
+        <font class="help-title-text">This provides a complete list and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/online.xml" target="_blank"><?php echo API_URL . '/'; ?>v1/online.xml</a></font><br /><br />
+        <font class="help-title-text">This provides a list from pool <?php echo $pool; ?> of 8 pools and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
+        <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/<?php echo $pool ; ?>/8/online.xml" target="_blank"><?php echo API_URL . '/'; ?>v1/<?php echo $pool ; ?>/8/online.xml</a></font><br /><br />
         <font class="help-title-text">This provides a list and keys of defined NTP Source tested to currently be offline from host on the service</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/offline.xml" target="_blank"><?php echo API_URL . '/'; ?>v1/offline.xml</a></font><br /><br />
         <font class="help-title-text">This provides a list and keys of defined in the offline.xml/online.xml api call as well as the ping time (least to greatest)</font><br/>

@@ -7,9 +7,9 @@ RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 
 RewriteRule ^([a-z0-9]{2})/(editntp|addntp).(asp|php|serial|json|xml|api)$ ./index.php?version=$1&mode=$2&format=$3 [L,NC,QSA]
-RewriteRule ^([a-z0-9]{2})/([0-9]+)/([0-9]+)/ntp.conf$ ./index.php?version=$1&mode=ntp.conf&format=conf&pool=$2&pools=$3 [L,NC,QSA]
-RewriteRule ^([a-z0-9]{2})/ntp.conf$ ./index.php?version=$1&mode=ntp.conf&format=conf [L,NC,QSA]
+RewriteRule ^([a-z0-9]{2})/([0-9]{1,2})/([0-9]{1,2})/ntp.conf$ ./index.php?version=$1&mode=ntp.conf&format=conf&pool=$2&pools=$3 [L,NC,QSA]
+RewriteRule ^([a-z0-9]{2})/ntp.conf$ ./index.php?version=$1&mode=ntp.conf&format=conf&pool=0&pools=0 [L,NC,QSA]
 RewriteRule ^([a-z0-9]{2})/(top|new|worse).(rss)$ ./index.php?version=$1&mode=$2&format=$3 [L,NC,QSA]
-RewriteRule ^([a-z0-9]{2})/([0-9]+)/([0-9]+)/(online).(asp|php|serial|json|xml)$ ./index.php?version=$1&pool=$2&pools=$3&mode=$4&format=$5 [L,NC,QSA]
-RewriteRule ^([a-z0-9]{2})/(online|offline|pings|uptime|downtime|nextping|companies|offcompanies).(asp|php|serial|json|xml)$ ./index.php?version=$1&mode=$2&format=$3 [L,NC,QSA]
+RewriteRule ^([a-z0-9]{2})/([0-9]{1,2})/([0-9]{1,2})/(online).(asp|php|serial|json|xml)$ ./index.php?version=$1&pool=$2&pools=$3&mode=$4&format=$5 [L,NC,QSA]
+RewriteRule ^([a-z0-9]{2})/(online|offline|pings|uptime|downtime|nextping|companies|offcompanies).(asp|php|serial|json|xml)$ ./index.php?version=$1&mode=$2&format=$3&pool=0&pools=0 [L,NC,QSA]
 RewriteRule ^index.html$ ./index.php [L]
