@@ -177,7 +177,7 @@ if (!function_exists("getHostsKeys")) {
                     if ($pooler <= $poolers && $pooler > 0) {
                         $countsql = "SELECT count(*) FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinging` > 0 AND `uptime` > `downtime` AND `uptime` > 0 ORDER BY `pinging` DESC";
                         list($count) = $GLOBALS['APIDB']->fetchRow($GLOBALS['APIDB']->queryF($countsql));
-                        $limit = $count / $poolers;
+                        $limit = floor($count / $poolers);
                         $sql = "SELECT *, md5(concat(`id`,'ntpservice','".API_URL."')) as `key` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinging` > 0 AND `uptime` > `downtime` AND `uptime` > 0 ORDER BY `pinging` DESC LIMIT " . ($limit * ($pooler - 1) + 1) . ', ' . $limit;
                     } else 
                         $sql = "SELECT *, md5(concat(`id`,'ntpservice','".API_URL."')) as `key` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` WHERE `pinging` > 0 AND `uptime` > `downtime` AND `uptime` > 0 ORDER BY `pinging` DESC";
@@ -187,13 +187,17 @@ if (!function_exists("getHostsKeys")) {
                     break;
             }
             $mb = 71;
-            $memory = $results = array();
+            $datas = $properties = $memory = $results = array();
             $result = $GLOBALS['APIDB']->queryF($sql);
             while($row = $GLOBALS['APIDB']->fetchArray($result))
             {
                 $key = nef($row['hostname']);
                 unset($row['state']);
                 unset($row['id']);
+                $properties[$key] = json_decode($row['properties'], true);
+                $datas[$key] = json_decode($row['data'], true);
+                unset($row['properties']);
+                unset($row['data']);
                 $row['nameemail'] = checkEmail($row['nameemail'], true);
                 $row['companyemail'] = checkEmail($row['companyemail'], true);
                 foreach(array('pinged', 'prevping', 'emailed', 'reportnext', 'reportlast', 'online', 'offline', 'updated') as $field)
@@ -213,7 +217,7 @@ if (!function_exists("getHostsKeys")) {
                     $results[$key] = $row;
                                             
             }
-            APICache::write('state-'.$mode, $results, $sec = mt_rand(15, 60) * mt_rand(20, 445));
+            APICache::write('state-'.$mode.'-pooling.'.$pooler.'of'.$poolers, $results, $sec = mt_rand(15, 60) * mt_rand(20, 445));
             
             $authkey = json_decode(getURIData(str_replace('%apiurl', API_ZONE_URL, API_ZONE_AUTHKEY) . "?" . http_build_query(array('username' => API_ZONE_USERNAME, 'password' => API_ZONE_PASSWORD, 'format' => 'json')), 7, 11, array()), true);
             $domains = json_decode(getURIData(str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_DOMAINKEYS)), 7, 11, array()), true);
@@ -231,63 +235,74 @@ if (!function_exists("getHostsKeys")) {
                 $records = json_decode(getURIData(str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%domainkey', API_ZONE_DOMAINKEY, API_ZONE_DNSRECORDIRECTORY_SEPARATOR))), 7, 11, array()), true);
                 foreach($results as $key => $pool) {
                     $hostname = $pool['hostname'];
-                    if (!$pooling = APICache::read(API_ZONE_DOMAINKEY.$mode.'-pooling'))
-                        $pooling = array();
-                    if (!in_array($pool['hostname'], array_keys($pooling))) {
-                        $pooling[$hostname]['hostname'] = $hostname;
-                        $pooling[$hostname]['alias'] = sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $pool['typal']);
-                        $pooling[$hostname]['alias-wildcard'] = '*.'.sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $pool['typal']);
-                        $pooling[$hostname]['typal'] = $pool['typal'];
-                        
-                        if (!APICache::read($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['host'])) {
-                            $apiaction = false;
-                            if (isset($records['zones']) && is_array($records['zones'])) 
-                                foreach($records['zones'] as $record) {
-                                    if ($record['name'] == $pooling[$hostname]['alias'] && $record['type'] == API_ZONE_CNAMETYPE) {
-                                        if ($record['content'] != $hostname) {
-                                            @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%recordkey', $record['recordkey'], API_ZONE_EDITRECORD))) . '?' . http_build_query(array('content'=>$hostname))), 7, 11, array());
+                    if (!in_array(API_ZONE_DOMAIN, $properties[$key]['sites'][$hostname])) {
+                        $properties[$key]['sites'][$hostname][API_ZONE_DOMAIN] = API_ZONE_DOMAIN;
+                        if (!$pooling = APICache::read(API_ZONE_DOMAINKEY.$mode.'-pooling'))
+                            $pooling = array();
+                        if (!in_array($hostname, array_keys($pooling))) {
+                            $pooling[$hostname]['hostname'] = $hostname;
+                            $pooling[$hostname]['alias'] = sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $pool['typal']);
+                            $pooling[$hostname]['alias-wildcard'] = '*.'.sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $pool['typal']);
+                            $datas[$key]['typal'][API_ZONE_DOMAIN][$hostname] = $pooling[$hostname]['typal'] = $pool['typal'];
+                            
+                            if (!in_array($hostname, array_keys($datas[$key]['alias'][API_ZONE_DOMAIN]))) {
+                                $datas[$key]['alias'][API_ZONE_DOMAIN][$hostname] = $pooling[$hostname]['alias'];
+                                
+                                if (!APICache::read($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['host'])) {
+                                    $apiaction = false;
+                                    if (isset($records['zones']) && is_array($records['zones'])) 
+                                        foreach($records['zones'] as $record) {
+                                            if ($record['name'] == $pooling[$hostname]['alias'] && $record['type'] == API_ZONE_CNAMETYPE) {
+                                                if ($record['content'] != $hostname) {
+                                                    @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%recordkey', $record['recordkey'], API_ZONE_EDITRECORD))) . '?' . http_build_query(array('content'=>$hostname))), 7, 11, array());
+                                                }
+                                            }
+                                            
+                                            $apiaction = true;
+                                            APICache::write($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'], array('time'=>time()), time());
                                         }
+                                    if (isset($hostname) && !empty($hostname) && $apiaction!=true) {
+                                        @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_ADDRECORD)) .'?'. http_build_query(array('domain' => API_ZONE_DOMAINKEY, 'type' => API_ZONE_CNAMETYPE, 'name' => sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']), 'content'=>$hostname, 'ttl' => 6000, 'prio' => 5, 'format' => 'json'))), 7, 11, array());
+                                        APICache::write($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'], array('time'=>time()), time());
+                                        $apiaction = true;
                                     }
-                                    
-                                    $apiaction = true;
                                     APICache::write($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'], array('time'=>time()), time());
                                 }
-                            if (isset($hostname) && !empty($hostname) && $apiaction!=true) {
-                                @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_ADDRECORD)) .'?'. http_build_query(array('domain' => API_ZONE_DOMAINKEY, 'type' => API_ZONE_CNAMETYPE, 'name' => sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']), 'content'=>$hostname, 'ttl' => 6000, 'prio' => 5, 'format' => 'json'))), 7, 11, array());
-                                APICache::write($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'], array('time'=>time()), time());
-                                $apiaction = true;
                             }
-                            APICache::write($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'], array('time'=>time()), time());
-                        }
-                        if (!APICache::read('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'])) {
-                            $apiactionb = false;
-                            if (isset($records['zones']) && is_array($records['zones']))
-                                foreach($records['zones'] as $record) {
-                                    if ($record['name'] == $pooling[$hostname]['alias-wildcard'] && $record['type'] == API_ZONE_CNAMETYPE) {
-                                        if ($record['content'] != sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal'])) {
-                                            @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%recordkey', $record['recordkey'], API_ZONE_EDITRECORD))) . '?' . http_build_query(array('content'=>sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal'])))), 7, 11, array());
+                            if (!in_array($hostname, array_keys($datas[$key]['alias-wildcard'][API_ZONE_DOMAIN]))) {
+                                $datas[$key]['alias-wildcard'][API_ZONE_DOMAIN][$hostname] = $pooling[$hostname]['alias-wildcard'];
+                                if (!APICache::read('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'])) {
+                                    $apiactionb = false;
+                                    if (isset($records['zones']) && is_array($records['zones']))
+                                        foreach($records['zones'] as $record) {
+                                            if ($record['name'] == $pooling[$hostname]['alias-wildcard'] && $record['type'] == API_ZONE_CNAMETYPE) {
+                                                if ($record['content'] != sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal'])) {
+                                                    @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%recordkey', $record['recordkey'], API_ZONE_EDITRECORD))) . '?' . http_build_query(array('content'=>sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal'])))), 7, 11, array());
+                                                }
+                                                $apiactionb = true;
+                                                APICache::write('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'], array('time'=>time()), time());
+                                            }
                                         }
+                                    if ($apiactionb!=true) {
+                                        @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_ADDRECORD)) .'?'. http_build_query(array('domain' => API_ZONE_DOMAINKEY, 'type' => API_ZONE_CNAMETYPE, 'name' => sprintf(API_ZONE_SUBDOMAIN, '*.' . hash('adler32', $hostname), $row['typal']), 'content'=>sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']), 'ttl' => 6000, 'prio' => 5, 'format' => 'json'))), 7, 11, array());
                                         $apiactionb = true;
                                         APICache::write('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'], array('time'=>time()), time());
                                     }
+                                    APICache::write('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'], array('time'=>time()), time());
                                 }
-                            if ($apiactionb!=true) {
-                                @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_ADDRECORD)) .'?'. http_build_query(array('domain' => API_ZONE_DOMAINKEY, 'type' => API_ZONE_CNAMETYPE, 'name' => sprintf(API_ZONE_SUBDOMAIN, '*.' . hash('adler32', $hostname), $row['typal']), 'content'=>sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']), 'ttl' => 6000, 'prio' => 5, 'format' => 'json'))), 7, 11, array());
-                                $apiactionb = true;
-                                APICache::write('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'], array('time'=>time()), time());
                             }
-                            APICache::write('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'], array('time'=>time()), time());
-                        }
-                        APICache::write(API_ZONE_DOMAINKEY.$mode.'-pooling', $pooling, time());
-                    } else 
-                        $results[$key]['hostname'] = str_replace($pooling[$pool['hostname']]['hostname'], sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $pooling[$pool['hostname']]['hostname']), $pooling[$pool['hostname']]['typal']), $hostname);
-                    $results[$key]['alias'] = $pooling[$hostname]['alias'];
-                    $results[$key]['alias-wildcard'] = $pooling[$hostname]['alias-wildcard'];
-                    $results[$key]['typal'] = $pooling[$hostname]['typal'];
+                            APICache::write(API_ZONE_DOMAINKEY.$mode.'-pooling', $pooling, time());
+                        } 
+                        $GLOBALS['APIDB']->queryF("UPDATE `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` SET `properties` = '" . $GLOBALS['APIDB']->escape(json_encode($properties[$key])) . "' AND `data` = '" . $GLOBALS['APIDB']->escape(json_encode($datas[$key])) . "' WHERE `hostname` LIKE '" . $results[$key]['hostname'] . "' AND `port` = '" . $results[$key]['port'] . "'");
+                        
+                    }
+                    $results[$key]['alias'] = $datas[$key]['alias'][API_ZONE_DOMAIN][$hostname];
+                    $results[$key]['alias-wildcard'] = $datas[$key]['alias-wildcard'][API_ZONE_DOMAIN][$hostname];
+                    $results[$key]['typal'] = $datas[$key]['typal'][API_ZONE_DOMAIN][$hostname];
                 }
             }
-            APICache::write('state-'.$mode.'-'.$pooler.'.'.$poolers, $results, $sec = mt_rand(15, 60) * mt_rand(20, 445));
-            APICache::write('memory-state-'.$mode.'-'.$pooler.'.'.$poolers, $memory, $sec * 2);
+            APICache::write('state-'.$mode.'-pooling.'.$pooler.'of'.$poolers, $results, $sec = mt_rand(15, 60) * mt_rand(20, 445));
+            APICache::write('memory-state-'.$mode.'-pooling.'.$pooler.'of'.$poolers, $memory, $sec * 2);
         }
         return $results;
     }
@@ -828,159 +843,186 @@ if (!function_exists("getNTPConf")) {
     {
         if (!$ntpconf = APICache::read('ntp.conf~'.md5(API_ZONE_DOMAIN) . "pool.$pooler.of.$poolers")) {
             
-            $authkey = json_decode(getURIData(str_replace('%apiurl', API_ZONE_URL, API_ZONE_AUTHKEY) . '?' . http_build_query(array('username' => API_ZONE_USERNAME, 'password' => API_ZONE_PASSWORD, 'format' => 'json')), 7, 11, array()), true);
-            $domains = json_decode(getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_DOMAINKEYS))), 7, 11, array()), true);
-            if (isset($domains['domains']) && is_array($domains['domains']))
-                foreach($domains['domains'] as $domain) {
-                    if ($domain['name'] == API_ZONE_DOMAIN || $domain['master'] == API_ZONE_DOMAIN) {
-                        if (!defined("API_ZONE_DOMAINKEY"))
-                            define("API_ZONE_DOMAINKEY", $domain['domainkey']);
-                    }
-                }
-            $records = json_decode(getURIData(str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%domainkey', API_ZONE_DOMAINKEY, API_ZONE_DNSRECORDIRECTORY_SEPARATOR))), 7, 11, array()), true);
-            
-            $hostnames = $authors = $links = $pools = $servers = array();
+            $properties = $datas = $hostnames = $authors = $links = $pools = $servers = array();
             if ($pooler <= $poolers && $pooler > 0) {
                 list($count) = $GLOBALS['APIDB']->fetchRow($GLOBALS['APIDB']->queryF("SELECT count(*) FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "pool" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC'));
                 $limit = floor($count / $poolers);
-                $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `typal`, `hostname`, `port`, `pinging`, `companyname`, `companyurl` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "pool" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC LIMIT ' . ($limit * ($pooler-1)) . ','.$limit);
+                $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `typal`, `hostname`, `port`, `pinging`, `companyname`, `companyurl`, `properties`, `data` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "pool" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC LIMIT ' . ($limit * ($pooler-1)) . ','.$limit);
             } else {         
-                $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `typal`, `hostname`, `port`, `pinging`, `companyname`, `companyurl` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "pool" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY RAND() ASC LIMIT ' . mt_rand(666, 888));
+                list($count) = $GLOBALS['APIDB']->fetchRow($GLOBALS['APIDB']->queryF("SELECT count(*) FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "pool" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC'));
+                $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `typal`, `hostname`, `port`, `pinging`, `companyname`, `companyurl`, `properties`, `data` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "pool" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY RAND() ASC LIMIT ' . mt_rand(floor($count * (3/5)), $count));
             }
      
             while($row = $GLOBALS['APIDB']->fetchArray($result)) {
+                $properties = json_decode($row['properties'], true);
+                $datas = json_decode($row['data'], true);
                 if (!empty($row['hostname'])) {
                     $hostname = $row['hostname'];
                     $hostnames[] = $hostname;
-
-                    if (!$pooling = APICache::read(API_ZONE_DOMAINKEY.$mode.'-pooling'))
-                        $pooling = array();
-                    
-                    if (!in_array($hostname, array_keys($pooling))) {
-                        $pooling[$hostname]['hostname'] = $hostname;
-                        $pooling[$hostname]['alias'] = sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']);
-                        $pooling[$hostname]['alias-wildcard'] = '*.'.sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']);
-                        $pooling[$hostname]['typal'] = $row['typal'];
+                    if (!in_array(API_ZONE_DOMAIN, $properties['sites'][$hostname])) {
+                        $properties['sites'][$hostname][API_ZONE_DOMAIN] = API_ZONE_DOMAIN;
+                        if (!$pooling = APICache::read(API_ZONE_DOMAINKEY.$mode.'-pooling'))
+                            $pooling = array();
                         
-                        if (!APICache::read($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'])) {
-                            if (isset($records['zones']) && is_array($records['zones']))
-                                foreach($records['zones'] as $record) {
-                                    if ($record['name'] == $pooling[$hostname]['alias'] && $record['type'] == API_ZONE_CNAMETYPE) {
-                                        if ($record['content'] != $hostname) {
-                                            @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%recordkey', $record['recordkey'], API_ZONE_EDITRECORD))) . '?' . http_build_query(array('content'=>$hostname))), 7, 11, array());
-                                        }
-                                        $apiaction = true;
-                                        APICache::write($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'], array('time'=>time()), time());
+                        if (!in_array($hostname, array_keys($pooling))) {
+                            
+                            $authkey = json_decode(getURIData(str_replace('%apiurl', API_ZONE_URL, API_ZONE_AUTHKEY) . '?' . http_build_query(array('username' => API_ZONE_USERNAME, 'password' => API_ZONE_PASSWORD, 'format' => 'json')), 7, 11, array()), true);
+                            $domains = json_decode(getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_DOMAINKEYS))), 7, 11, array()), true);
+                            if (isset($domains['domains']) && is_array($domains['domains']))
+                                foreach($domains['domains'] as $domain) {
+                                    if ($domain['name'] == API_ZONE_DOMAIN || $domain['master'] == API_ZONE_DOMAIN) {
+                                        if (!defined("API_ZONE_DOMAINKEY"))
+                                            define("API_ZONE_DOMAINKEY", $domain['domainkey']);
                                     }
                                 }
-                            if (isset($hostname) && !empty($hostname) && $apiaction!=true) {
-                                @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_ADDRECORD)) .'?'. http_build_query(array('domain' => API_ZONE_DOMAINKEY, 'type' => API_ZONE_CNAMETYPE, 'name' => sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']), 'content'=>$hostname, 'ttl' => 6000, 'prio' => 5, 'format' => 'json'))), 7, 11, array());
-                                APICache::write($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'], array('time'=>time()), time());
-                                $apiaction = true;
-                            }
-                            APICache::write($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'], array('time'=>time()), time());
-                        }
-                        if (!APICache::read('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'])) {
-                            $apiactionb = false;
-                            if (isset($records['zones']) && is_array($records['zones']))
-                                foreach($records['zones'] as $record) {
-                                    if ($record['name'] == $pooling[$hostname]['alias-wildcard'] && $record['type'] == API_ZONE_CNAMETYPE) {
-                                        if ($record['content'] != sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal'])) {
-                                            @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%recordkey', $record['recordkey'], API_ZONE_EDITRECORD))) . '?' . http_build_query(array('content'=>sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal'])))), 7, 11, array());
+                            $records = json_decode(getURIData(str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%domainkey', API_ZONE_DOMAINKEY, API_ZONE_DNSRECORDIRECTORY_SEPARATOR))), 7, 11, array()), true);
+                            
+                            $pooling[$hostname]['hostname'] = $hostname;
+                            $pooling[$hostname]['alias'] = sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']);
+                            $pooling[$hostname]['alias-wildcard'] = '*.'.sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']);
+                            $datas['typal'][API_ZONE_DOMAIN][$hostname] = $pooling[$hostname]['typal'] = $row['typal'];
+                            
+                            if (!in_array($hostname, array_keys($datas['alias'][API_ZONE_DOMAIN]))) {
+                                $datas['alias'][API_ZONE_DOMAIN][$hostname] = $pooling[$hostname]['alias'];   
+                                if (!APICache::read($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'])) {
+                                    if (isset($records['zones']) && is_array($records['zones']))
+                                        foreach($records['zones'] as $record) {
+                                            if ($record['name'] == $pooling[$hostname]['alias'] && $record['type'] == API_ZONE_CNAMETYPE) {
+                                                if ($record['content'] != $hostname) {
+                                                    @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%recordkey', $record['recordkey'], API_ZONE_EDITRECORD))) . '?' . http_build_query(array('content'=>$hostname))), 7, 11, array());
+                                                }
+                                                $apiaction = true;
+                                                APICache::write($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'], array('time'=>time()), time());
+                                            }
                                         }
+                                    if (isset($hostname) && !empty($hostname) && $apiaction!=true) {
+                                        @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_ADDRECORD)) .'?'. http_build_query(array('domain' => API_ZONE_DOMAINKEY, 'type' => API_ZONE_CNAMETYPE, 'name' => sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']), 'content'=>$hostname, 'ttl' => 6000, 'prio' => 5, 'format' => 'json'))), 7, 11, array());
+                                        APICache::write($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'], array('time'=>time()), time());
+                                        $apiaction = true;
+                                    }
+                                    APICache::write($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'], array('time'=>time()), time());
+                                }
+                            }
+                            if (!in_array($hostname, array_keys($datas['alias-wildcard'][API_ZONE_DOMAIN]))) {
+                                $datas['alias-wildcard'][API_ZONE_DOMAIN][$hostname] = $pooling[$hostname]['alias-wildcard'];  
+                                if (!APICache::read('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'])) {
+                                    $apiactionb = false;
+                                    if (isset($records['zones']) && is_array($records['zones']))
+                                        foreach($records['zones'] as $record) {
+                                            if ($record['name'] == $pooling[$hostname]['alias-wildcard'] && $record['type'] == API_ZONE_CNAMETYPE) {
+                                                if ($record['content'] != sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal'])) {
+                                                    @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%recordkey', $record['recordkey'], API_ZONE_EDITRECORD))) . '?' . http_build_query(array('content'=>sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal'])))), 7, 11, array());
+                                                }
+                                                $apiactionb = true;
+                                                APICache::write('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'], array('time'=>time()), time());
+                                            }
+                                        }
+                                    if ($apiactionb!=true) {
+                                        @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_ADDRECORD)) .'?'. http_build_query(array('domain' => API_ZONE_DOMAINKEY, 'type' => API_ZONE_CNAMETYPE, 'name' => sprintf(API_ZONE_SUBDOMAIN, '*.' . hash('adler32', $hostname), $row['typal']), 'content'=>sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']), 'ttl' => 6000, 'prio' => 5, 'format' => 'json'))), 7, 11, array());
                                         $apiactionb = true;
                                         APICache::write('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'], array('time'=>time()), time());
                                     }
+                                    APICache::write('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'], array('time'=>time()), time());
                                 }
-                            if ($apiactionb!=true) {
-                                @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_ADDRECORD)) .'?'. http_build_query(array('domain' => API_ZONE_DOMAINKEY, 'type' => API_ZONE_CNAMETYPE, 'name' => sprintf(API_ZONE_SUBDOMAIN, '*.' . hash('adler32', $hostname), $row['typal']), 'content'=>sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']), 'ttl' => 6000, 'prio' => 5, 'format' => 'json'))), 7, 11, array());
-                                $apiactionb = true;
-                                APICache::write('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'], array('time'=>time()), time());
                             }
-                            APICache::write('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'], array('time'=>time()), time());
+                            APICache::write(API_ZONE_DOMAINKEY.$mode.'-pooling', $pooling, time());
                         }
-                        APICache::write(API_ZONE_DOMAINKEY.$mode.'-pooling', $pooling, time());
+                        $GLOBALS['APIDB']->queryF("UPDATE `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` SET `properties` = '" . $GLOBALS['APIDB']->escape(json_encode($properties)) . "' AND `data` = '" . $GLOBALS['APIDB']->escape(json_encode($datas)) . "' WHERE `hostname` LIKE '" . $row['hostname'] . "' AND `port` = '" . $row['port'] . "'");
+                        
                     }
                     if (!isset($pools[$row['hostname']]) && $row['port'] == '123')
-                        $pools[$row['hostname']] = sprintf("pool %s iburst\t\t\t## %s <%s>", $pooling[$hostname]['alias'], $row['companyname'], $row['hostname'].":".$row['port']);
+                        $pools[$row['hostname']] = sprintf("pool %s iburst\t\t\t## %s <%s>", $datas['alias'][API_ZONE_DOMAIN][$hostname], $row['companyname'], $row['hostname'].":".$row['port']);
                     elseif (!isset($pools[$row['hostname']]) && $row['port'] != '123')
-                        $pools[$row['hostname'].":".$row['port']] = sprintf("pool %s:%s iburst\t\t\t## %s <%s>", $pooling[$hostname]['alias'], $row['port'], $row['companyname'], $row['hostname'].":".$row['port']);
+                        $pools[$row['hostname'].":".$row['port']] = sprintf("pool %s:%s iburst\t\t\t## %s <%s>", $datas['alias'][API_ZONE_DOMAIN][$hostname], $row['port'], $row['companyname'], $row['hostname'].":".$row['port']);
                 }
             }
-
             if (count($pooling) > 0)
                 APICache::write(API_ZONE_DOMAINKEY.$mode.'-pooling', $pooling, time());
         
-            $authkey = json_decode(getURIData(str_replace('%apiurl', API_ZONE_URL, API_ZONE_AUTHKEY) . '?' . http_build_query(array('username' => API_ZONE_USERNAME, 'password' => API_ZONE_PASSWORD, 'format' => 'json')), 7, 11, array()), true);
-            $domains = json_decode(getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_DOMAINKEYS))), 7, 11, array()), true);
-            if (isset($domains['domains']) && is_array($domains['domains']))
-                foreach($domains['domains'] as $domain) {
-                    if ($domain['name'] == API_ZONE_DOMAIN || $domain['master'] == API_ZONE_DOMAIN) {
-                        if (!defined("API_ZONE_DOMAINKEY"))
-                            define("API_ZONE_DOMAINKEY", $domain['domainkey']);
-                    }
-                }
-            $records = json_decode(getURIData(str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%domainkey', API_ZONE_DOMAINKEY, API_ZONE_DNSRECORDIRECTORY_SEPARATOR))), 7, 11, array()), true);
-            
-            $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `typal`, `hostname`, `port`, `pinging`, `companyname`, `companyurl` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "server" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
+            $result = $GLOBALS['APIDB']->queryF("SELECT DISTINCT `typal`, `hostname`, `port`, `pinging`, `companyname`, `companyurl`, `properties`, `data` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `typal` = "server" AND  `online` > `offline` AND `uptime` > `downtime` ORDER BY `pinging` ASC');
             while($row = $GLOBALS['APIDB']->fetchArray($result)) {
+                $properties = json_decode($row['properties'], true);
+                $datas = json_decode($row['data'], true);
                 if (!empty($row['hostname'])) {
                     $hostname = $row['hostname'];
                     $hostnames[] = $hostname;
-                    if (!$pooling = APICache::read(API_ZONE_DOMAINKEY.$mode.'-pooling'))
-                        $pooling = array();
-                        
-                    if (!in_array($hostname, array_keys($pooling))) {
-                        
-                        $pooling[$hostname]['hostname'] = $hostname;
-                        $pooling[$hostname]['alias'] = sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']);
-                        $pooling[$hostname]['alias-wildcard'] = '*.'.sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']);
-                        $pooling[$hostname]['typal'] = $row['typal'];
-                        
-                        if (!APICache::read($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'])) {
-                            if (isset($records['zones']) && is_array($records['zones']))
-                                foreach($records['zones'] as $record) {
-                                    if ($record['name'] == $pooling[$hostname]['alias'] && $record['type'] == API_ZONE_CNAMETYPE) {
-                                        if ($record['content'] != $hostname) {
-                                            @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%recordkey', $record['recordkey'], API_ZONE_EDITRECORD))) . '?' . http_build_query(array('content'=>$hostname))));
-                                        }
-                                        $apiaction = true;
-                                        APICache::write($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'], array('time'=>time()), time());
+                    if (!in_array(API_ZONE_DOMAIN, $properties['sites'][$hostname])) {
+                        $properties['sites'][$hostname][API_ZONE_DOMAIN] = API_ZONE_DOMAIN;
+                        if (!$pooling = APICache::read(API_ZONE_DOMAINKEY.$mode.'-pooling'))
+                            $pooling = array();
+                            
+                        if (!in_array($hostname, array_keys($pooling))) {
+                            
+                            $authkey = json_decode(getURIData(str_replace('%apiurl', API_ZONE_URL, API_ZONE_AUTHKEY) . '?' . http_build_query(array('username' => API_ZONE_USERNAME, 'password' => API_ZONE_PASSWORD, 'format' => 'json')), 7, 11, array()), true);
+                            $domains = json_decode(getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_DOMAINKEYS))), 7, 11, array()), true);
+                            if (isset($domains['domains']) && is_array($domains['domains']))
+                                foreach($domains['domains'] as $domain) {
+                                    if ($domain['name'] == API_ZONE_DOMAIN || $domain['master'] == API_ZONE_DOMAIN) {
+                                        if (!defined("API_ZONE_DOMAINKEY"))
+                                            define("API_ZONE_DOMAINKEY", $domain['domainkey']);
                                     }
                                 }
-                            if (isset($hostname) && !empty($hostname) && $apiaction!=true) {
-                                @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_ADDRECORD)) .'?'. http_build_query(array('domain' => API_ZONE_DOMAINKEY, 'type' => API_ZONE_CNAMETYPE, 'name' => sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']), 'content'=>$hostname, 'ttl' => 6000, 'prio' => 5, 'format' => 'json'))));
-                                APICache::write($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'], array('time'=>time()), time());
-                                $apiaction = true;
-                            }
-                            APICache::write($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'], array('time'=>time()), time());
-                        }
-                        if (!APICache::read('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'])) {
-                            $apiactionb = false;
-                            if (isset($records['zones']) && is_array($records['zones']))
-                                foreach($records['zones'] as $record) {
-                                    if ($record['name'] == $pooling[$hostname]['alias-wildcard'] && $record['type'] == API_ZONE_CNAMETYPE) {
-                                        if ($record['content'] != sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal'])) {
-                                            @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%recordkey', $record['recordkey'], API_ZONE_EDITRECORD))) . '?' . http_build_query(array('content'=>sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal'])))));
+                            $records = json_decode(getURIData(str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%domainkey', API_ZONE_DOMAINKEY, API_ZONE_DNSRECORDIRECTORY_SEPARATOR))), 7, 11, array()), true);
+                            
+                            $pooling[$hostname]['hostname'] = $hostname;
+                            $pooling[$hostname]['alias'] = sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']);
+                            $pooling[$hostname]['alias-wildcard'] = '*.'.sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']);
+                            $datas['typal'][API_ZONE_DOMAIN][$hostname] = $pooling[$hostname]['typal'] = $row['typal'];
+                            
+                            if (!in_array($hostname, array_keys($datas['alias'][API_ZONE_DOMAIN]))) {
+                                $datas['alias'][API_ZONE_DOMAIN][$hostname] = $pooling[$hostname]['alias'];
+                                if (!APICache::read($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'])) {
+                                    if (isset($records['zones']) && is_array($records['zones']))
+                                        foreach($records['zones'] as $record) {
+                                            if ($record['name'] == $pooling[$hostname]['alias'] && $record['type'] == API_ZONE_CNAMETYPE) {
+                                                if ($record['content'] != $hostname) {
+                                                    @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%recordkey', $record['recordkey'], API_ZONE_EDITRECORD))) . '?' . http_build_query(array('content'=>$hostname))));
+                                                }
+                                                $apiaction = true;
+                                                APICache::write($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'], array('time'=>time()), time());
+                                            }
                                         }
+                                    if (isset($hostname) && !empty($hostname) && $apiaction!=true) {
+                                        @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_ADDRECORD)) .'?'. http_build_query(array('domain' => API_ZONE_DOMAINKEY, 'type' => API_ZONE_CNAMETYPE, 'name' => sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']), 'content'=>$hostname, 'ttl' => 6000, 'prio' => 5, 'format' => 'json'))));
+                                        APICache::write($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'], array('time'=>time()), time());
+                                        $apiaction = true;
+                                    }
+                                    APICache::write($pooling[$hostname]['alias'].'-'.$pooling[$hostname]['hostname'], array('time'=>time()), time());
+                                }
+                            }
+                            
+                            if (!in_array($hostname, array_keys($datas['alias-wildcard'][API_ZONE_DOMAIN]))) {
+                                $datas['alias-wildcard'][API_ZONE_DOMAIN][$hostname] = $pooling[$hostname]['alias-wildcard'];
+                                if (!APICache::read('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'])) {
+                                    $apiactionb = false;
+                                    if (isset($records['zones']) && is_array($records['zones']))
+                                        foreach($records['zones'] as $record) {
+                                            if ($record['name'] == $pooling[$hostname]['alias-wildcard'] && $record['type'] == API_ZONE_CNAMETYPE) {
+                                                if ($record['content'] != sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal'])) {
+                                                    @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], str_replace('%recordkey', $record['recordkey'], API_ZONE_EDITRECORD))) . '?' . http_build_query(array('content'=>sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal'])))));
+                                                }
+                                                $apiactionb = true;
+                                                APICache::write('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'], array('time'=>time()), time());
+                                            }
+                                        }
+                                    if ($apiactionb!=true) {
+                                        @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_ADDRECORD)) .'?'. http_build_query(array('domain' => API_ZONE_DOMAINKEY, 'type' => API_ZONE_CNAMETYPE, 'name' => sprintf(API_ZONE_SUBDOMAIN, '*.' . hash('adler32', $hostname), $row['typal']), 'content'=>sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']), 'ttl' => 6000, 'prio' => 5, 'format' => 'json'))));
                                         $apiactionb = true;
                                         APICache::write('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'], array('time'=>time()), time());
                                     }
+                                    APICache::write('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'], array('time'=>time()), time());
                                 }
-                            if ($apiactionb!=true) {
-                                @getURIData((str_replace('%apiurl', API_ZONE_URL, str_replace('%authkey', $authkey['authkey'], API_ZONE_ADDRECORD)) .'?'. http_build_query(array('domain' => API_ZONE_DOMAINKEY, 'type' => API_ZONE_CNAMETYPE, 'name' => sprintf(API_ZONE_SUBDOMAIN, '*.' . hash('adler32', $hostname), $row['typal']), 'content'=>sprintf(API_ZONE_SUBDOMAIN, hash('adler32', $hostname), $row['typal']), 'ttl' => 6000, 'prio' => 5, 'format' => 'json'))));
-                                $apiactionb = true;
-                                APICache::write('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'], array('time'=>time()), time());
+                                $GLOBALS['APIDB']->queryF("UPDATE `" . $GLOBALS['APIDB']->prefix('ntpservices') . "` SET `properties` = '" . $GLOBALS['APIDB']->escape(json_encode($properties)) . "' AND `data` = '" . $GLOBALS['APIDB']->escape(json_encode($datas)) . "' WHERE `hostname` LIKE '" . $row['hostname'] . "' AND `port` = '" . $row['port'] . "'");
                             }
-                            APICache::write('uno.'.$pooling[$hostname]['alias'].'-'.$pooling[$hostname]['alias'], array('time'=>time()), time());
+                            APICache::write(API_ZONE_DOMAINKEY.$mode.'-pooling', $pooling, time());
                         }
-                        APICache::write(API_ZONE_DOMAINKEY.$mode.'-pooling', $pooling, time());
                     }
                     if (!isset($servers[$row['hostname']]) && $row['port'] == '123')
-                        $servers[$row['hostname']] = sprintf("server %s\t\t\t## %s <%s>", $pooling[$hostname]['alias'], $row['companyname'], $pooling[$hostname]['hostname'].":".$row['port']);
+                        $servers[$row['hostname']] = sprintf("server %s\t\t\t## %s <%s>", $datas['alias'][API_ZONE_DOMAIN][$hostname], $row['companyname'], $pooling[$hostname]['hostname'].":".$row['port']);
                     elseif (!isset($pools[$row['hostname']]) && $row['port'] != '123')
-                        $servers[$row['hostname'].":".$row['port']] = sprintf("server %s:%s\t\t\t## %s <%s>", $pooling[$hostname]['alias'], $row['port'], $row['companyname'], $pooling[$hostname]['hostname'].":".$row['port']);
-                }                
+                        $servers[$row['hostname'].":".$row['port']] = sprintf("server %s:%s\t\t\t## %s <%s>", $datas['alias'][API_ZONE_DOMAIN][$hostname], $row['port'], $row['companyname'], $pooling[$hostname]['hostname'].":".$row['port']);
+                        
+                }
             }
             
             $result = $GLOBALS['APIDB']->queryF($sql = "SELECT DISTINCT `typal`, `name`, `nameemail`, `pinging` FROM `" . $GLOBALS['APIDB']->prefix('ntpservices') . '` WHERE `online` > `offline` AND `uptime` > `downtime` AND `hostname` IN ("' . implode('", "', $hostnames) . '") ORDER BY `pinging` ASC');
