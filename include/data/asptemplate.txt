@@ -1,0 +1,7 @@
+<%@ LANGUAGE="VBSCRIPT" %>
+<%
+Dim resultsNTP() 
+
+%DATA%
+
+%> 

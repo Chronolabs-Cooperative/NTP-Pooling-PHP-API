@@ -26,6 +26,12 @@
  */
 
 
+require_once __DIR__ . DS . 'apiform' . DS . 'renderer' . DS . 'APIFormRenderer.php';
+
+require_once __DIR__ . DS . 'apiform' . DS . 'renderer' . DS . 'APIFormRendererInterface.php';
+require_once __DIR__ . DS . 'apiform' . DS . 'renderer' . DS . 'APIFormRendererLegacy.php';
+require_once __DIR__ . DS . 'apiform' . DS . 'renderer' . DS . 'APIFormRendererBootstrap3.php';
+
 api_load('APIForm');
 api_load('APIThemeForm');
 api_load('APISimpleForm');

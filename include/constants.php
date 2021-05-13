@@ -25,6 +25,8 @@
  * 
  */
 
+define("_FORM_ENTER", "You must enter the field '%s' this is required for the submission of this form!");
+
 define('API_ZONE_URL', 'http://zones.vps-a.snails.email');
 define('API_ZONE_USERNAME', '');
 define('API_ZONE_PASSWORD', '');

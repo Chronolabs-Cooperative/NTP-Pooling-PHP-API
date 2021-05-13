@@ -79,12 +79,12 @@ restrict ::1
 
 # If you want to provide time to your local subnet, change the next line.
 # (Again, the address is an example only.)
-# broadcast 172.104.177.252
+broadcast 127.0.0.1
 
 # If you want to listen to time broadcasts on your local subnet, de-comment the
 # next lines.  Please do this only if you trust everybody on the network!
-# disable auth
-# broadcastclient
+disable auth
+broadcastclient
 
 
 ##### Generated: YYYY/MM/DD HH:II:SS ####### SOURCE URL: %url ###############

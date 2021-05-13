@@ -25,8 +25,8 @@
  * 
  */
 
-ini_set('display_errors', false);
-error_reporting(0);
+ini_set('display_errors', true);
+error_reporting(E_ALL);
 
 if (!is_file(__DIR__ . DIRECTORY_SEPARATOR . 'mainfile.php') || !is_file(__DIR__ . DIRECTORY_SEPARATOR . 'include' . DIRECTORY_SEPARATOR . 'license.php'))
 {

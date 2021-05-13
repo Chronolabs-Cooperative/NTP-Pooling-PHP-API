@@ -37,7 +37,7 @@ define('API_DB_CHARSET', 'utf8');
 
 // Table Prefix
 // This prefix will be added to all new tables created to avoid name conflict in the database. If you are unsure, just use the default "api".
-define('API_DB_PREFIX', 'time_');
+define('API_DB_PREFIX', '');
 
 // Database Hostname
 // Hostname of the database server. If you are unsure, "localhost" works in most cases.
@@ -45,15 +45,15 @@ define('API_DB_HOST', 'localhost');
 
 // Database Username
 // Your database user account on the host
-define('API_DB_USER', '');
+define('API_DB_USER', 'simonaroberts-com');
 
 // Database Password
 // Password for your database user account
-define('API_DB_PASS', '');
+define('API_DB_PASS', 'mypass||||-');
 
 // Database Name
 // The name of database on the host. The installer will attempt to create the database if not exist
-define('API_DB_NAME', 'ntp-snails-email');
+define('API_DB_NAME', 'simonaroberts-com');
 
 // Use persistent connection? (Yes=1 No=0)
 // Default is "Yes". Choose "Yes" if you are unsure.

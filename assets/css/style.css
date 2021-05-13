@@ -5,6 +5,7 @@ body {
 	font-size: 1.398633em;
 	text-align:justify;
 }
+
 .main {
 	font-family: "Labtop Thin" !important;
 	font-size: 1.179894em;
@@ -80,4 +81,19 @@ input, button, textarea, radio, select, label
 	font-weight:600;
 	font-size:0.6781115em;
 	margin-top: 3px;
+}
+
+.api-form-element-help {
+	font-family: "Labtop", "Trebuchet MS", Arial, Helvetica, sans-serif !important;
+	font-size:75% !important;
+	margin-top:6px !important;
+	margin-left: 14px !important;
+}
+
+th {
+	font-family: "Labtop", "Trebuchet MS", Arial, Helvetica, sans-serif !important;
+	font-size:275% !important;
+	margin-top:6px !important;
+	margin-left: 14px !important;
+	text-align: center !important;
 }

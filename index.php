@@ -25,18 +25,10 @@
  * 
  */
 
-
-	$parts = explode(".", microtime(true));
-	mt_srand(mt_rand(-microtime(true), microtime(true))/$parts[1]);
-	mt_srand(mt_rand(-microtime(true), microtime(true))/$parts[1]);
-	mt_srand(mt_rand(-microtime(true), microtime(true))/$parts[1]);
-	mt_srand(mt_rand(-microtime(true), microtime(true))/$parts[1]);
-	$salter = ((float)(mt_rand(0,1)==1?'':'-').$parts[1].'.'.$parts[0]) / sqrt((float)$parts[1].'.'.intval(cosh($parts[0])))*tanh($parts[1]) * mt_rand(1, intval($parts[0] / $parts[1]));
-	header('Blowfish-salt: '. $salter);
 	
 	require_once __DIR__ . DIRECTORY_SEPARATOR . 'apiconfig.php';
-	error_reporting(E_ERROR);
-	ini_set('display_errors', true);
+	require_once __DIR__ . DIRECTORY_SEPARATOR . 'class' . DIRECTORY_SEPARATOR . 'apiformloader.php';
+
 	$odds = $inner = array();
 	foreach($_GET as $key => $values) {
 	    if (!isset($inner[$key])) {
@@ -168,7 +160,7 @@
 			echo '</pre>';
 			break;
 		case 'asp':
-		    echo convertPHP2ASP("<?php\n\n \$" . $inner['mode'] . " = " . var_export($data, true) . ";\n\n?>");
+		    echo convert2ASP($data);
 		    break;
 		case 'php':
 			echo "<?php\n\n return " . var_export($data, true) . ";\n\n?>";

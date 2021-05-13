@@ -24,7 +24,7 @@
  * @link            https://twitter.com/ChronolabsCoop
  * 
  */
-
+srand(time());
     ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -36,7 +36,7 @@
 <meta property="og:site_name" content="<?php echo API_VERSION; ?> - <?php echo API_LICENSE_COMPANY; ?>"/>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta http-equiv="rating" content="general" />
-<meta http-equiv="author" content="wishcraft@users.sourceforge.net" />
+<meta http-equiv="author" content="chronolabscoop@users.sourceforge.net" />
 <meta http-equiv="copyright" content="<?php echo API_LICENSE_COMPANY; ?> &copy; <?php echo date("Y"); ?>" />
 <meta http-equiv="generator" content="Chronolabs Cooperative (<?php echo $place['iso3']; ?>)" />
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
@@ -53,11 +53,15 @@
 	}, 
 	'follow' : {
 	  'services' : [
-		{'service': 'facebook', 'id': 'Chronolabs'},
+		{'service': 'facebook', 'id': 'ChronolabsCoop'},
 		{'service': 'twitter', 'id': 'JohnRingwould'},
 		{'service': 'twitter', 'id': 'ChronolabsCoop'},
-		{'service': 'twitter', 'id': 'Cipherhouse'},
+		{'service': 'twitter', 'id': 'EmpressJX'},
 		{'service': 'twitter', 'id': 'OpenRend'},
+		{'service': 'twitter', 'id': 'distancesid'},
+		{'service': 'twitter', 'id': 'vcf5project'},
+		{'service': 'twitter', 'id': 'hexsteph'},
+		{'service': 'linkedin', 'id': 'founderprinciple'},
 	  ]
 	},  
 	'whatsnext' : {},  
@@ -93,7 +97,7 @@
     <p>As an API, this allows you to anonymously without authentication add either IPv4, IPv6 or Network Netbios Hostnames for NTP Time based services on the internet and the wider worlds of networking.</p>
     <p>You can get the NTP Protocol this is a time exchange based protocol which computers and the internet use to lookup and calibrate your own system clocks; so to use this you would from the following URL on your Windows or Macintosh Control Panel + System Settings in the time options; it also work in your internet router at home or in the office; put the following host pathname:<p>
     <p style="text-align: center; font-size: 245%"><em><strong><?php echo parse_url(API_URL, PHP_URL_HOST); ?></strong></em></p>
-    <p style="font-size: 145%">For any on going details of this timing-bell please referee to our online documentation here: <a href="https://sourceforge.net/p/chronolabs-cooperative/wiki/NTP%20Servers%20Pooling/" target="_blank">https://sourceforge.net/p/chronolabs-cooperative/wiki/NTP Servers Pooling/</a>... You will also find a backup of the data on this API on the following GitHub.com: <a href="https://github.com/DrARoberts/ntp-db-list" target="_blank">https://github.com/DrARoberts/ntp-db-list</a>...</a></p>
+    <p style="font-size: 145%">For any on going details of this timing-bell please referee to our online documentation here: <a href="https://sourceforge.net/p/chronolabs-cooperative/wiki/NTP%20Servers%20Pooling/" target="_blank">https://sourceforge.net/p/chronolabs-cooperative/wiki/NTP Servers Pooling/</a>... You will also find a backup of the data on this API on the following Sourceforge.io: <a href="https://chronolabs-cooperative.sourceforge.io/ntp-db-list" target="_blank">https://chronolabs-cooperative.sourceforge.io/ntp-db-list</a>...</a></p>
     <h2>Code API Documentation</h2>
     <p>You can find the phpDocumentor code API documentation at the following path :: <a href="<?php echo API_URL . '/'; ?>docs/" target="_blank"><?php echo API_URL . '/'; ?>docs/</a>. These should outline the source code core functions and classes for the API to function!</p>
     <h2>ADDNTP Document Output</h2>
@@ -121,16 +125,19 @@
 ## CronJob:-
 ## */15 */4 * * * sh /var/replace-ntp.conf.sh
 ##
+## require ntpd install on ubuntu run: $ sudo apt install ntp -y 
+## require curl install on ubuntu run: $ sudo apt install curl -y
+## require ntp on startup execution run once: $ sudo systemctl enable ntp
 ##
 cd /tmp
 rm -vf ntp.conf
-wget --tries=9 --timeout=4567 <?php echo API_URL . '/'; ?>v1/ntp.conf
+curl <?php echo API_URL . '/'; ?>v1/ntp.conf > /tmp/ntp.conf
 if [ -s "/tmp/ntp.conf" ]
 then
-   rm -vf /etc/ntp.conf 
-   mv /tmp/ntp.conf /etc
-   chmod -fv 0644 /etc/ntp.conf
+   cp /tmp/ntp.conf /etc/ntp.conf
+   rm /tmp/ntp.conf
    service ntp reload
+   systemctl reload ntp
 else
    echo " ntp.conf was returned empty or not existing! "
 fi
@@ -168,7 +175,7 @@ fi
         <font class="help-title-text">This provides a list of the companies which are currently offline currently!</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/offcompanies.php" target="_blank"><?php echo API_URL . '/'; ?>v1/offcompanies.php</a></font><br /><br />
     </blockquote>
-    <!--<h2>ASP Document Output</h2>
+    <h2>ASP Document Output</h2>
     <p>This is done with the <em>command.asp</em> extension at the end of the url.</p>
     <blockquote>
         <font class="help-title-text">This provides a complete list and keys of defined NTP Source tested to currently be online from host on the service</font><br/>
@@ -185,7 +192,7 @@ fi
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/downtime.asp" target="_blank"><?php echo API_URL . '/'; ?>v1/downtime.asp</a></font><br /><br />
         <font class="help-title-text">This provides a list and keys of defined in the offline.asp/online.asp api call as well as the next time the key is due to be pinged by timeout (least to greatest)</font><br/>
         <font class="help-url-example"><a href="<?php echo API_URL . '/'; ?>v1/nextping.asp" target="_blank"><?php echo API_URL . '/'; ?>v1/nextping.asp</a></font><br /><br />
-    </blockquote>-->
+    </blockquote>
     <h2>Serialisation Document Output</h2>
     <p>This is done with the <em>command.serial</em> extension at the end of the url.</p>
     <blockquote>

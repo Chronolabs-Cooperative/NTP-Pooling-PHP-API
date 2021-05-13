@@ -26,9 +26,6 @@
  */
 
 
-require_once __DIR__ . DIRECTORY_SEPARATOR . 'functions.php2asp.php';
-
-
 if (!function_exists("formatRssTimestamp")) {
     function formatRssTimestamp($time)
     {
@@ -830,6 +827,19 @@ if (!function_exists("formatMSASTime")) {
     }
 }
 
+if (!function_exists("convert2ASP")) {
+    function convert2ASP($data = array()) {
+        $datatext = '';
+        foreach($data as $key => $values)
+            if (is_array($values)) {
+                foreach($values as $name => $value)
+                    $datatext . 'resultsNTP("' . $key . '")("' . $name . '") = "' . $value . "\"\n\r";
+            } else
+                $datatext . 'resultsNTP("' . $key . '") = "' . $values . "\"\n\r";
+        return str_replace('%DATA%', $datatext, file_get_contents(__DIR__ . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'asptemplate.txt'));
+    }
+}
+    
 if (!function_exists("getNTPConf")) {
     
     /* function getNTPConf()
@@ -1233,25 +1243,35 @@ function getHTMLForm($mode = '', $var = '')
         case "addntp":
             error_reporting(E_ALL);
             ini_set('display_errors', true);
+            api_load('APIForm');
             $apiform = new APIThemeForm('Add New NTP Network Source', 'addntp', API_URL . '/v1/addntp.api', 'post', false, 'This form is used for creating a new entry in the NTP Services Pools Database - A Telephanist is someone that is used for a template like DJ on Reports Coming From this Service - you can create a forwarder for company name and telephanist@ntp.example.com!');
             $objform = array();
             $objform['hostname']['obj'] = new APIFormText("Hostname/IP Address:", "hostname", 28, 250);
+            $objform['hostname']['description'] = ("NTP Service IP Address or Hostname (Will Test!)");
             $objform['hostname']['required'] = true;
             $objform['port']['obj'] = new APIFormText("Port:", "port", 8, 5);
+            $objform['port']['description'] = ("NTP Service Port (Normally 123, 124, 125)");
             $objform['port']['required'] = true;
             $objform['name']['obj'] = new APIFormText("Telephantist Name:", "name", 28, 128);
+            $objform['name']['description'] = ("This is who manages and reporting telephany is based on the record!");
             $objform['name']['required'] = true;
             $objform['nameurl']['obj'] = new APIFormText("Telephantist URL:", "nameurl", 28, 128);
+            $objform['nameurl']['description'] = ("This is who manages and reporting telephany is based on blog or information site URL for the record!");
             $objform['nameurl']['required'] = false;
             $objform['nameemail']['obj'] = new APIFormText("Telephantist eMail:", "nameemail", 28, 196);
+            $objform['nameemail']['description'] = ("This is who manages and reporting telephany is based on the record email address, will recieve no reporting emails!");
             $objform['nameemail']['required'] = true;
-            $objform['companyname']['obj'] = new APIFormText("Company's Name:", "name", 28, 128);
+            $objform['companyname']['obj'] = new APIFormText("Company's Name:", "companyname", 28, 128);
+            $objform['companyname']['description'] = ("Company/Organisation/Facility name not a url or abbrivation complete name only!");
             $objform['companyname']['required'] = true;
-            $objform['companyemail']['obj'] = new APIFormText("Company's eMail:", "nameemail", 28, 196);
+            $objform['companyemail']['obj'] = new APIFormText("Company's eMail:", "companyemail", 28, 196);
+            $objform['companyemail']['description'] = ("Company/Organisation/Facility email for NTP Services; indirect reporting will be sent to this address should goto who manages the NTP Services!");
             $objform['companyemail']['required'] = true;
             $objform['companyrbn']['obj'] = new APIFormText("Company's Register Number:", "companyrbn", 28, 196);
+            $objform['companyrbn']['description'] = ("Business/Facility Rego Number or simply Postcode for a location postcode or zip for the rego number!");
             $objform['companyrbn']['required'] = true;
             $objform['companyrbntype']['obj'] = new APIFormText("Company's Register Number Type:", "companyrbntype", 8, 16);
+            $objform['companyrbntype']['description'] = ("This is the TLA name of the Business Rego Number or simply Postcode for a location postcode or zip for the rego number!");
             $objform['companyrbntype']['required'] = true;
             $objform['companyurl']['obj'] = new APIFormText("Company URL:", "companyurl", 28, 128);
             $objform['companyurl']['required'] = false;
@@ -1265,143 +1285,59 @@ function getHTMLForm($mode = '', $var = '')
             $objform['mode']['required'] = false;
             $objform['submit']['obj'] = new APIFormButton("Add NTP Source to DB", "submit", 'submit');
             $objform['submit']['required'] = false;
-            foreach($objform as $key => $obj)
+            foreach($objform as $key => $obj) {
+                if (isset($objform[$key]['description']))
+                    $objform[$key]['obj']->setDescription($objform[$key]['description']);
                 $apiform->addElement($objform[$key]['obj'], $objform[$key]['required']);
+            }
             return $apiform->render();
             break;
             
         case "editntp":
-            $form[] = "<form name='edit-ntp' method=\"POST\" enctype=\"multipart/form-data\" action=\"" . API_URL . '/v1/'.$var['key'].'/editntp.api">';
-            $form[] = "\t<table class='edit-ntp' id='auth-key' style='vertical-align: top !important; min-width: 98%;'>";
-            $form[] = "\t\t<tr>";
-            $form[] = "\t\t\t<td style='width: 499px;'>";
-            $form[] = "\t\t\t\t<label for='hostname'>Hostname/IP Address:</label>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>";
-            $form[] = "\t\t\t\t<input type='textbox' name='hostname' id='hostname' maxlen='250' size='28' value='".$var['hostname']."'/>&nbsp;&nbsp;";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>&nbsp;</td>";
-            $form[] = "\t\t</tr>";
-            $form[] = "\t\t<tr>";
-            $form[] = "\t\t\t<td style='width: 499px;'>";
-            $form[] = "\t\t\t\t<label for='port'>Port:</label>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>";
-            $form[] = "\t\t\t\t<input type='textbox' name='port' id='port' maxlen='5'  size='8' value='123'  value='".$var['port']."'/>&nbsp;&nbsp;";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>&nbsp;</td>";
-            $form[] = "\t\t</tr>";
-            $form[] = "\t\t<tr>";
-            $form[] = "\t\t\t<td style='width: 499px;'>";
-            $form[] = "\t\t\t\t<label for='name'>Telephanist's Name:</label>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>";
-            $form[] = "\t\t\t\t<input type='textbox' name='name' id='name' maxlen='128' size='28'  value='".$var['name']."'/><br/>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>&nbsp;</td>";
-            $form[] = "\t\t</tr>";
-            $form[] = "\t\t<tr>";
-            $form[] = "\t\t\t<td style='width: 499px;'>";
-            $form[] = "\t\t\t\t<label for='nameurl'>Telephanist's URL:</label>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>";
-            $form[] = "\t\t\t\t<input type='textbox' name='nameurl' id='nameurl' maxlen='250'  size='28' value='".$var['nameurl']."'/><br/>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>&nbsp;</td>";
-            $form[] = "\t\t</tr>";
-            $form[] = "\t\t<tr>";
-            $form[] = "\t\t\t<td style='width: 499px;'>";
-            $form[] = "\t\t\t\t<label for='nameemail'>Telephanist's eMail:</label>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>";
-            $form[] = "\t\t\t\t<input type='textbox' name='nameemail' id='nameemail' maxlen='196'  size='28'  value='".$var['nameemail']."'/><br/>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>&nbsp;</td>";
-            $form[] = "\t\t</tr>";
-            $form[] = "\t\t<tr>";
-            $form[] = "\t\t\t<td style='width: 499px;'>";
-            $form[] = "\t\t\t\t<label for='companyname'>Company's Name:</label>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>";
-            $form[] = "\t\t\t\t<input type='textbox' name='companyname' id='companyname' maxlen='128'  size='28' value='".$var['companyname']."'/><br/>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>&nbsp;</td>";
-            $form[] = "\t\t</tr>";
-            $form[] = "\t\t<tr>";
-            $form[] = "\t\t\t<td style='width: 499px;'>";
-            $form[] = "\t\t\t\t<label for='companyemail'>Company's eMail:</label>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>";
-            $form[] = "\t\t\t\t<input type='textbox' name='companyemail' id='companyemail' maxlen='196' size='28' value='".$var['companyemail']."'/><br/>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>&nbsp;</td>";
-            $form[] = "\t\t</tr>";
-            $form[] = "\t\t<tr>";
-            $form[] = "\t\t\t<td style='width: 499px;'>";
-            $form[] = "\t\t\t\t<label for='companyrbn'>Company's Register Number:</label>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>";
-            $form[] = "\t\t\t\t<input type='textbox' name='companyrbn' id='companyrbn' maxlen='128' size='28' value='".$var['companyrbn']."'/><br/>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>&nbsp;</td>";
-            $form[] = "\t\t</tr>";
-            $form[] = "\t\t<tr>";
-            $form[] = "\t\t\t<td style='width: 499px;'>";
-            $form[] = "\t\t\t\t<label for='companyrbntype'>Company's Register Number Type:</label>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>";
-            $form[] = "\t\t\t\t<input type='textbox' name='companyrbntype' id='companyrbntype' maxlen='13'  size='8' value='".$var['companyrbntype']."'/><br/>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>&nbsp;</td>";
-            $form[] = "\t\t</tr>";
-            $form[] = "\t\t<tr>";
-            $form[] = "\t\t\t<td style='width: 499px;'>";
-            $form[] = "\t\t\t\t<label for='companytype'>Company's Type:</label>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>";
-            $form[] = "\t\t\t\t<input type='textbox' name='companytype' id='companytype' maxlen='64'  size='28' value='".$var['companytype']."'/><br/>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>&nbsp;</td>";
-            $form[] = "\t\t</tr>";
-            $form[] = "\t\t<tr>";
-            $form[] = "\t\t\t<td style='width: 499px;'>";
-            $form[] = "\t\t\t\t<label for='companyurl'>Company's URL:</label>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>";
-            $form[] = "\t\t\t\t<input type='textbox' name='companyurl' id='companyurl' maxlen='250'  size='28' value='".$var['companyurl']."'/><br/>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>&nbsp;</td>";
-            $form[] = "\t\t</tr>";
-            $form[] = "\t\t<tr>";
-            $form[] = "\t\t\t<td>";
-            $form[] = "\t\t\t\t<label for='format'>Output Format:</label>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td style='width: 499px;'>";
-            $form[] = "\t\t\t\t<select name='format' id='format'/>";
-            $form[] = "\t\t\t\t\t<option value='raw'>RAW PHP Output</option>";
-            $form[] = "\t\t\t\t\t<option value='json' selected='selected'>JSON Output</option>";
-            $form[] = "\t\t\t\t\t<option value='serial'>Serialisation Output</option>";
-            $form[] = "\t\t\t\t\t<option value='xml'>XML Output</option>";
-            $form[] = "\t\t\t\t</select>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t\t<td>&nbsp;</td>";
-            $form[] = "\t\t</tr>";
-            $form[] = "\t\t<tr>";
-            $form[] = "\t\t\t<td colspan='3' style='padding-left:64px;'>";
-            $form[] = "\t\t\t\t<input type='hidden' value='editntp' name='mode'>";
-            $form[] = "\t\t\t\t<input type='hidden' value='key' name='".$var['key']."'>";
-            $form[] = "\t\t\t\t<input type='submit' value='Edit NTP Source in DB' name='submit' style='padding:11px; font-size:122%;'>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t</tr>";
-            $form[] = "\t\t<tr>";
-            $form[] = "\t\t\t<td colspan='3' style='padding-top: 8px; padding-bottom: 14px; padding-right:35px; text-align: right;'>";
-            $form[] = "\t\t\t\t<font style='color: rgb(250,0,0); font-size: 139%; font-weight: bold;'>* </font><font  style='color: rgb(10,10,10); font-size: 99%; font-weight: bold'><em style='font-size: 76%'>~ Required Field for Form Submission</em></font>";
-            $form[] = "\t\t\t</td>";
-            $form[] = "\t\t</tr>";
-            $form[] = "\t\t<tr>";
-            $form[] = "\t</table>";
-            $form[] = "</form>";
+            error_reporting(E_ALL);
+            ini_set('display_errors', true);
+            api_load('APIForm');
+            $apiform = new APIThemeForm('Add New NTP Network Source', 'editntp', API_URL . '/v1/'.$var['key'].'/editntp.api', 'post', false, 'This form is used for creating a new entry in the NTP Services Pools Database - A Telephanist is someone that is used for a template like DJ on Reports Coming From this Service - you can create a forwarder for company name and telephanist@ntp.example.com!');
+            $objform = array();
+            $objform['hostname']['obj'] = new APIFormText("Hostname/IP Address:", "hostname", 28, 250, $var['hostname']);
+            $objform['hostname']['required'] = true;
+            $objform['port']['obj'] = new APIFormText("Port:", "port", 8, 5, $var['port']);
+            $objform['port']['required'] = true;
+            $objform['name']['obj'] = new APIFormText("Telephantist Name:", "name", 28, 128, $var['name']);
+            $objform['name']['required'] = true;
+            $objform['nameurl']['obj'] = new APIFormText("Telephantist URL:", "nameurl", 28, 128, $var['nameurl']);
+            $objform['nameurl']['required'] = false;
+            $objform['nameemail']['obj'] = new APIFormText("Telephantist eMail:", "nameemail", 28, 196, $var['nameemail']);
+            $objform['nameemail']['required'] = true;
+            $objform['companyname']['obj'] = new APIFormText("Company's Name:", "companyname", 28, 128, $var['companyname']);
+            $objform['companyname']['required'] = true;
+            $objform['companyemail']['obj'] = new APIFormText("Company's eMail:", "companyemail", 28, 196, $var['companyrbn']);
+            $objform['companyemail']['required'] = true;
+            $objform['companyrbn']['obj'] = new APIFormText("Company's Register Number:", "companyrbn", 28, 196, $var['companyrbn']);
+            $objform['companyrbn']['obj']->setDescription("Business/Facility Rego Number or simply Postcode for a location postcode or zip for the rego number!");
+            $objform['companyrbn']['required'] = true;
+            $objform['companyrbntype']['obj'] = new APIFormText("Company's Register Number Type:", "companyrbntype", 8, 16, $var['companyrbntype']);
+            $objform['companyrbntype']['obj']->setDescription("This is the TLA name of the Business Rego Number or simply Postcode for a location postcode or zip for the rego number!");
+            $objform['companyrbntype']['required'] = true;
+            $objform['companyurl']['obj'] = new APIFormText("Company URL:", "companyurl", 28, 128, $var['companyurl']);
+            $objform['companyurl']['required'] = false;
+            $objform['format']['obj'] = new APIFormSelect("Output Format::", "format", 4, 4);
+            $objform['format']['required'] = true;
+            $objform['format']['obj']->addOption('raw', 'RAW PHP Output');
+            $objform['format']['obj']->addOption('json', 'JSON Output');
+            $objform['format']['obj']->addOption('serial', 'Serialisation Output');
+            $objform['format']['obj']->addOption('xml', 'XML Output');
+            $objform['mode']['obj'] = new APIFormHidden("mode", "editntp");
+            $objform['mode']['required'] = false;
+            $objform['mode']['obj'] = new APIFormHidden("key", $var['key']);
+            $objform['mode']['required'] = false;
+            $objform['submit']['obj'] = new APIFormButton("Edit NTP from Bucky Record to Assigned - Only Happens Once!", "submit", 'submit');
+            $objform['submit']['required'] = false;
+            foreach($objform as $key => $obj)
+                $apiform->addElement($objform[$key]['obj'], $objform[$key]['required']);
+                return $apiform->render();
             break;
+            
                     
     }
     return implode("\n", $form);
